@@ -45,6 +45,10 @@ public class SocketClient implements Runnable {
 
     public static void sendMessage(String message){
         assert out != null;
-        out.println(message);
+        try {
+            out.println(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

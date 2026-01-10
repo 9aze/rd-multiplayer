@@ -37,8 +37,8 @@ public class Minecraft implements Runnable {
     /**
      * Screen resolution
      */
-    private final int width = 1024;
-    private final int height = 768;
+    private final int width = 1920;
+    private final int height = 1080;
 
     /**
      * Tile picking

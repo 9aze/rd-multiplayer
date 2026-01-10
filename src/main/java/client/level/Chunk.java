@@ -84,7 +84,7 @@ public class Chunk {
         // Setup tile rendering
         glNewList(this.lists + layer, GL_COMPILE);
         glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE, TEXTURE);
+        Textures.bind(TEXTURE);
         TESSELLATOR.init();
 
         // For each tile in this chunk
