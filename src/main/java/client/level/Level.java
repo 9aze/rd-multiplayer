@@ -12,12 +12,12 @@ import java.util.zip.GZIPOutputStream;
 
 public class Level {
 
-    public final int width;
-    public final int height;
-    public final int depth;
+    public int width;
+    public int height;
+    public int depth;
 
-    private final byte[] blocks;
-    private final int[] lightDepths;
+    private byte[] blocks;
+    private int[] lightDepths;
 
     private final ArrayList<LevelListener> levelListeners = new ArrayList<>();
 
@@ -53,38 +53,20 @@ public class Level {
         calcLightDepths(0, 0, width, height);
 
         // Load level if it exists
-        load();
+        //load();
     }
 
-    /**
-     * Load blocks from level.dat
-     */
-    public void load() {
-        try {
-            DataInputStream dis = new DataInputStream(new GZIPInputStream(new FileInputStream("level.dat")));
-            dis.readFully(this.blocks);
-            calcLightDepths(0, 0, this.width, this.height);
-            dis.close();
+    public void loadLevel(int w, int h, int d, byte[] blocks) {
+        this.width = w;
+        this.height = h;
+        this.depth = d;
+        this.blocks = blocks;
 
-            // Notify all tiles changed
-            for (LevelListener levelListener : this.levelListeners) {
-                levelListener.allChanged();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+        this.lightDepths = new int[w * h];
 
-    /**
-     * Store blocks in level.dat
-     */
-    public void save() {
-        try {
-            DataOutputStream dos = new DataOutputStream(new GZIPOutputStream(new FileOutputStream("level.dat")));
-            dos.write(this.blocks);
-            dos.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        calcLightDepths(0, 0, w, h);
+        for (LevelListener levelListener : this.levelListeners) {
+            levelListener.allChanged();
         }
     }
 
@@ -275,4 +257,10 @@ public class Level {
     public void addListener(LevelListener levelListener) {
         this.levelListeners.add(levelListener);
     }
+
+    public byte[] getBlocks() {return this.blocks;}
+
+    public int getWidth() { return this.width; }
+    public int getHeight() { return this.height; }
+    public int getDepth() { return this.depth; }
 }

@@ -88,5 +88,13 @@ public class Level {
 
         // Set tile
         this.blocks[(y * this.height + z) * this.width + x] = (byte) id;
+        save();
     }
+
+
+    public byte[] getBlocks() {return this.blocks;}
+
+    public int getWidth() { return this.width; }
+    public int getHeight() { return this.height; }
+    public int getDepth() { return this.depth; }
 }

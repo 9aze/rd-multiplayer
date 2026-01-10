@@ -29,8 +29,8 @@ public class Minecraft implements Runnable {
 
     private final Timer timer = new Timer(60);
 
-    private Level level;
-    private LevelRenderer levelRenderer;
+    public Level level;
+    public LevelRenderer levelRenderer;
     private Player player;
 
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
@@ -48,7 +48,25 @@ public class Minecraft implements Runnable {
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
 
+    public int pendingWidth = -1;
+    public int pendingHeight = -1;
+    public int pendingDepth = -1;
+    public byte[] pendingBlocks = null;
+    public boolean levelUpdatePending = false;
+
+    private void applyPendingLevel() {
+        if (!levelUpdatePending) return;
+        this.level = new client.level.Level(pendingWidth, pendingHeight, pendingDepth);
+        this.level.loadLevel(pendingWidth, pendingHeight, pendingDepth, pendingBlocks);
+        this.levelRenderer = new client.level.LevelRenderer(this.level);
+        this.player = new Player(this.level);
+
+        levelUpdatePending = false;
+        System.out.println("Level loaded from server!");
+    }
+
     public Minecraft() throws IOException {
+        mc = this;
     }
 
     /**
@@ -58,7 +76,6 @@ public class Minecraft implements Runnable {
      * @throws LWJGLException Game could not be initialized
      */
     public void init() throws LWJGLException {
-        mc = this;
         // Write fog color
         this.fogColor.put(new float[]{
                 14 / 255.0F,
@@ -84,11 +101,6 @@ public class Minecraft implements Runnable {
         glEnable(GL_CULL_FACE);
         glDepthFunc(GL_LEQUAL);
 
-        // Create level and player (Has to be in main thread)
-        this.level = new Level(256, 256, 64);
-        this.levelRenderer = new LevelRenderer(this.level);
-        this.player = new Player(this.level);
-
         // Grab mouse cursor
         Mouse.setGrabbed(true);
     }
@@ -97,8 +109,6 @@ public class Minecraft implements Runnable {
      * Destroy mouse, keyboard and display
      */
     public void destroy() {
-        this.level.save();
-
         Mouse.destroy();
         Keyboard.destroy();
         Display.destroy();
@@ -111,26 +121,27 @@ public class Minecraft implements Runnable {
     @Override
     public void run() {
         socketThread.start();
+
         try {
-            // Initialize the game
+            // Initialize OpenGL immediately (dummy level)
             init();
+            System.out.println("Game initialized, waiting for server level...");
         } catch (Exception e) {
-            // Show error message dialog and stop the game
             JOptionPane.showMessageDialog(null, e, "Failed to start RubyDung", JOptionPane.ERROR_MESSAGE);
             System.exit(0);
         }
 
-        // To keep track of framerate
         int frames = 0;
         long lastTime = System.currentTimeMillis();
 
         try {
-            // Start the game loop
+            // Main game loop
             while (!Keyboard.isKeyDown(1) && !Display.isCloseRequested()) {
+
                 // Update the timer
                 this.timer.advanceTime();
 
-                // Call the tick to reach updates 20 per seconds
+                // Tick updates (20 times per second)
                 for (int i = 0; i < this.timer.ticks; ++i) {
                     tick();
                 }
@@ -138,18 +149,12 @@ public class Minecraft implements Runnable {
                 // Render the game
                 render(this.timer.partialTicks);
 
-                // Increase rendered frame
                 frames++;
 
-                // Loop if a second passed
+                // Print FPS every second
                 while (System.currentTimeMillis() >= lastTime + 1000L) {
-                    // Print amount of frames
                     System.out.println(frames + " fps, " + Chunk.updates);
-
-                    // Reset global rebuild stats
                     Chunk.updates = 0;
-
-                    // Increase last time printed and reset frame counter
                     lastTime += 1000L;
                     frames = 0;
                 }
@@ -157,15 +162,16 @@ public class Minecraft implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            // Destroy I/O and save game
             destroy();
         }
     }
+
 
     /**
      * Game tick, called exactly 20 times per second
      */
     private void tick() {
+        applyPendingLevel();
         this.player.tick();
     }
 
@@ -310,91 +316,67 @@ public class Minecraft implements Runnable {
      * @param partialTicks Overflow ticks to calculate smooth a movement
      */
     private void render(float partialTicks) throws IOException {
-        // Get mouse motion
-        float motionX = Mouse.getDX();
-        float motionY = Mouse.getDY();
-
-        // Rotate the camera using the mouse motion input
-        this.player.turn(motionX, motionY);
-
-        // Pick tile
-        pick(partialTicks);
-
-        // Listen for mouse inputs
-        while (Mouse.next()) {
-            if (Mouse.getEventButton() == 0 && Mouse.getEventButtonState() && this.hitResult != null) {
-                // Destroy the tile
-               // this.level.setTile(this.hitResult.x, this.hitResult.y, this.hitResult.z, 0);
-                SocketClient.sendBlock(Packets.BLOCK_BREAK, this.hitResult.x, this.hitResult.y, this.hitResult.z);
-            }
-
-            if (Mouse.getEventButton() == 1 && Mouse.getEventButtonState() && this.hitResult != null) {
-                // Get target tile position
-                int x = this.hitResult.x;
-                int y = this.hitResult.y;
-                int z = this.hitResult.z;
-
-                // Get position of the tile using face direction
-                if (this.hitResult.face == 0) y--;
-                if (this.hitResult.face == 1) y++;
-                if (this.hitResult.face == 2) z--;
-                if (this.hitResult.face == 3) z++;
-                if (this.hitResult.face == 4) x--;
-                if (this.hitResult.face == 5) x++;
-
-                // Set the tile
-               // this.level.setTile(x, y, z, 1);
-                SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z);
-            }
-        }
-
-        // Listen for keyboard inputs
-        while (Keyboard.next()) {
-
-            // On 'Enter' key press
-            if (Keyboard.getEventKey() == 28 && Keyboard.getEventKeyState()) {
-
-                // Save the level
-                this.level.save();
-            }
-        }
-
-        // Clear color and depth buffer and reset the camera
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Setup normal player camera
-        setupCamera(partialTicks);
+        if (!levelUpdatePending && level.getWidth() > 0 && level.getHeight() > 0 && level.getDepth() > 0) {
+            // Normal game rendering
+            // Get mouse motion
+            float motionX = Mouse.getDX();
+            float motionY = Mouse.getDY();
+            this.player.turn(motionX, motionY);
 
-        // Setup fog
-        glEnable(GL_FOG);
-        glFogi(GL_FOG_MODE, GL_LINEAR);
-        glFogf(GL_FOG_START, -10);
-        glFogf(GL_FOG_END, 20);
-        glFog(GL_FOG_COLOR, this.fogColor);
-        glDisable(GL_FOG);
+            // Tile picking
+            pick(partialTicks);
 
-        // Render bright tiles
-        this.levelRenderer.render(0);
+            // Mouse input for breaking/placing blocks
+            while (Mouse.next()) {
+                if (Mouse.getEventButtonState() && hitResult != null) {
+                    if (Mouse.getEventButton() == 0)
+                        SocketClient.sendBlock(Packets.BLOCK_BREAK, hitResult.x, hitResult.y, hitResult.z);
+                    if (Mouse.getEventButton() == 1) {
+                        int x = hitResult.x;
+                        int y = hitResult.y;
+                        int z = hitResult.z;
+                        if (hitResult.face == 0) y--;
+                        if (hitResult.face == 1) y++;
+                        if (hitResult.face == 2) z--;
+                        if (hitResult.face == 3) z++;
+                        if (hitResult.face == 4) x--;
+                        if (hitResult.face == 5) x++;
+                        SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z);
+                    }
+                }
+            }
 
-        // Enable fog to render shadow
-        glEnable(GL_FOG);
+            // Setup camera
+            setupCamera(partialTicks);
 
-        // Render dark tiles in shadow
-        this.levelRenderer.render(1);
+            // Render fog and level
+            glEnable(GL_FOG);
+            glFogi(GL_FOG_MODE, GL_LINEAR);
+            glFogf(GL_FOG_START, -10);
+            glFogf(GL_FOG_END, 20);
+            glFog(GL_FOG_COLOR, this.fogColor);
+            glDisable(GL_FOG);
 
-        // Finish rendering
-        glDisable(GL_TEXTURE_2D);
+            levelRenderer.render(0);
+            glEnable(GL_FOG);
+            levelRenderer.render(1);
+            glDisable(GL_TEXTURE_2D);
 
-        // Render the actual hit
-        if (this.hitResult != null) {
-            this.levelRenderer.renderHit(this.hitResult);
+            if (hitResult != null)
+                levelRenderer.renderHit(hitResult);
+
+            glDisable(GL_FOG);
+
+        } else {
+            glClearColor(0, 0, 0, 1);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 
-        glDisable(GL_FOG);
-
-        // Update the display
         Display.update();
     }
+
 
     /**
      * Entry point of the game

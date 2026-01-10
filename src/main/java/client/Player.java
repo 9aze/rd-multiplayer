@@ -113,7 +113,7 @@ public class Player {
         }
 
         // Add motion to the player using keyboard input
-        moveRelative(vertical, forward, this.onGround ? 0.02F : 0.005F);
+        moveRelative(vertical, forward, this.onGround ? 0.07F : 0.005F);
 
         // Apply gravity motion
         this.motionY -= 0.005D;

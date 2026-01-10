@@ -69,7 +69,7 @@ public class Server {
                         break;
                     }
 
-                    case Packets.LEVEL_DATA: {
+                    case Packets.REQUEST_LEVEL: {
                         sendLevel(out);
                         break;
                     }
@@ -84,7 +84,7 @@ public class Server {
             System.out.println("Client disconnected.");
         } finally {
             if (out != null) {
-                clients.remove(out); // IMPORTANT
+                clients.remove(out);
             }
             try {
                 socket.close();
@@ -105,12 +105,13 @@ public class Server {
     }
 
     private static void sendLevel(DataOutputStream out) throws IOException {
+        byte[] blocks = level.getBlocks(); 
         out.writeByte(Packets.LEVEL_DATA);
-        out.writeInt(level.width);
-        out.writeInt(level.height);
-        out.writeInt(level.depth);
-        out.writeInt(level.blocks.length);
-        out.write(level.blocks);
+        out.writeInt(level.getWidth());
+        out.writeInt(level.getHeight());
+        out.writeInt(level.getDepth());
+        out.writeInt(blocks.length);
+        out.write(blocks);
         out.flush();
     }
 }

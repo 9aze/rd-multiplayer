@@ -27,6 +27,10 @@ public class SocketClient implements Runnable {
 
             SocketClient.out = out;
 
+            //request level from server
+            out.writeByte(Packets.REQUEST_LEVEL);
+            out.flush();
+
             while (true) {
                 byte packetId = in.readByte();
 
@@ -49,7 +53,7 @@ public class SocketClient implements Runnable {
                     }
 
                     case Packets.LEVEL_DATA: {
-                        /*int w = in.readInt();
+                        int w = in.readInt();
                         int h = in.readInt();
                         int d = in.readInt();
 
@@ -57,9 +61,14 @@ public class SocketClient implements Runnable {
                         byte[] blocks = new byte[len];
                         in.readFully(blocks);
 
-                        //Minecraft.mc.loadLevel(w, h, d, blocks);*/
+                        Minecraft.mc.pendingWidth = w;
+                        Minecraft.mc.pendingHeight = h;
+                        Minecraft.mc.pendingDepth = d;
+                        Minecraft.mc.pendingBlocks = blocks;
+                        Minecraft.mc.levelUpdatePending = true;
                         break;
                     }
+
 
                     default:
                         System.err.println("Unknown packet: " + packetId);
