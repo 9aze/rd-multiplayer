@@ -21,11 +21,19 @@ dependencies {
 }
 
 
-task("run", JavaExec::class) {
+tasks.register<JavaExec>("runClient") {
     jvmArgs = listOf("-Dorg.lwjgl.librarypath=${project.projectDir.toPath()}\\run\\natives")
-    main = "client.rubydung.RubyDung"
+    mainClass.set("client.RubyDung")
     classpath = sourceSets["main"].runtimeClasspath
-    workingDir("${project.projectDir.toPath()}\\run")
+    workingDir = file("${project.projectDir.toPath()}\\run")
+    dependsOn("extractNatives")
+}
+
+tasks.register<JavaExec>("runServer") {
+    jvmArgs = listOf("-Dorg.lwjgl.librarypath=${project.projectDir.toPath()}\\run\\natives")
+    mainClass.set("server.Server")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = file("${project.projectDir.toPath()}\\run")
     dependsOn("extractNatives")
 }
 
