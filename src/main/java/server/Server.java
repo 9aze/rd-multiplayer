@@ -12,18 +12,30 @@ public class Server {
         ServerSocket serverSocket = new ServerSocket(9090);
         System.out.println("server started...");
 
-        Socket clientSocket = serverSocket.accept();
-        System.out.println("client connected...");
+        while (true) {
+            Socket clientSocket = serverSocket.accept();
+            System.out.println(String.format("client connected from: %s", clientSocket.getInetAddress().getHostAddress()));
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+            new Thread(() -> handleClient(clientSocket)).start();
+        }
+    }
 
-        String message = in.readLine();
-        System.out.println("client: " + message);
+    private static void handleClient(Socket clientSocket) {
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
 
-        out.println("Message received.");
+            String message;
+            while((message = in.readLine()) != null) {
+                System.out.println("Client: " + message);
+                out.println("(Echo) " + message);
+            }
 
-        clientSocket.close();
-        serverSocket.close();
+            System.out.println("Client disconnected.");
+            clientSocket.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

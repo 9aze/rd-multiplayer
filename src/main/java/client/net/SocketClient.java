@@ -9,6 +9,7 @@ import java.net.Socket;
 public class SocketClient implements Runnable {
     private final String host;
     private final int port;
+    public static PrintWriter out;
 
     public SocketClient(String host, int port){
         this.host = host;
@@ -20,17 +21,30 @@ public class SocketClient implements Runnable {
         try {
             Socket socket = new Socket(host, port);
 
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             out.println("This is a test msg");
 
-            String response = in.readLine();
-            System.out.println("Server: " + response);
+            new Thread(() -> {
+                String response;
+                try {
+                    while((response = in.readLine()) != null) {
+                        System.out.println("Server: " + response);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
 
-            socket.close();
+
         } catch(IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void sendMessage(String message){
+        assert out != null;
+        out.println(message);
     }
 }
