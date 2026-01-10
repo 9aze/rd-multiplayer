@@ -86,6 +86,7 @@ public class Player {
         this.prevZ = this.z;
 
         float forward = 0.0F;
+        float strafe = 0.0F;
         float vertical = 0.0F;
 
         // Reset the position of the player
@@ -112,8 +113,10 @@ public class Player {
             }
         }
 
-        // Add motion to the player using keyboard input
-        moveRelative(vertical, forward, this.onGround ? 0.07F : 0.005F);
+        boolean sprinting = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
+        float speed = sprinting ? 0.08F : 0.04F; // sprintSpeed : groundSpeed
+
+        moveRelative(strafe, forward, this.onGround ? speed : 0.005F);
 
         // Apply gravity motion
         this.motionY -= 0.005D;
