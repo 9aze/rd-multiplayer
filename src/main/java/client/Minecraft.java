@@ -21,7 +21,7 @@ import static org.lwjgl.util.glu.GLU.gluPerspective;
 import static org.lwjgl.util.glu.GLU.gluPickMatrix;
 
 public class Minecraft implements Runnable {
-
+    public static Minecraft mc;
 
     SocketClient socket = new SocketClient("localhost", 9090);
     Thread socketThread = new Thread(socket);
@@ -57,6 +57,7 @@ public class Minecraft implements Runnable {
      * @throws LWJGLException Game could not be initialized
      */
     public void init() throws LWJGLException {
+        mc = this;
         // Write fog color
         this.fogColor.put(new float[]{
                 14 / 255.0F,
@@ -320,14 +321,12 @@ public class Minecraft implements Runnable {
 
         // Listen for mouse inputs
         while (Mouse.next()) {
-            // Right click
             if (Mouse.getEventButton() == 0 && Mouse.getEventButtonState() && this.hitResult != null) {
                 // Destroy the tile
-                this.level.setTile(this.hitResult.x, this.hitResult.y, this.hitResult.z, 0);
-                SocketClient.sendMessage(String.format("BLOCK_BREAK at %s, %s, %s", this.hitResult.x,  this.hitResult.y, this.hitResult.z));
+               // this.level.setTile(this.hitResult.x, this.hitResult.y, this.hitResult.z, 0);
+                SocketClient.sendMessage(String.format("BLOCK_BREAK %s,%s,%s", this.hitResult.x,  this.hitResult.y, this.hitResult.z));
             }
 
-            // Left click
             if (Mouse.getEventButton() == 1 && Mouse.getEventButtonState() && this.hitResult != null) {
                 // Get target tile position
                 int x = this.hitResult.x;
@@ -343,8 +342,8 @@ public class Minecraft implements Runnable {
                 if (this.hitResult.face == 5) x++;
 
                 // Set the tile
-                this.level.setTile(x, y, z, 1);
-                SocketClient.sendMessage(String.format("BLOCK_PLACE at %s, %s, %s", this.hitResult.x,  this.hitResult.y, this.hitResult.z));
+               // this.level.setTile(x, y, z, 1);
+                SocketClient.sendMessage(String.format("BLOCK_PLACE %s,%s,%s", x,  y, z));
             }
         }
 
@@ -404,4 +403,7 @@ public class Minecraft implements Runnable {
     public static void main(String[] args) throws IOException {
         new Thread(new Minecraft()).start();
     }
+
+    public Minecraft getMc() { return mc; };
+    public Level getLevel() {return level;}
 }

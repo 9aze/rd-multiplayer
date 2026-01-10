@@ -1,5 +1,7 @@
 package client.net;
 
+import client.Minecraft;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -24,12 +26,29 @@ public class SocketClient implements Runnable {
             out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            out.println("This is a test msg");
-
             new Thread(() -> {
                 String response;
                 try {
                     while((response = in.readLine()) != null) {
+                        String[] parts = response.split(" ");
+
+                        if(response.startsWith("BLOCK_BREAK")) {
+                            String args = parts[1];
+
+                            String[] coords = args.split(",");
+                            int x = Integer.parseInt(coords[0].trim());
+                            int y = Integer.parseInt(coords[1].trim());
+                            int z = Integer.parseInt(coords[2].trim());
+                            Minecraft.mc.getLevel().setTile(x, y, z, 0);
+                        } else if(response.startsWith("BLOCK_PLACE")) {
+                            String args = parts[1];
+
+                            String[] coords = args.split(",");
+                            int x = Integer.parseInt(coords[0].trim());
+                            int y = Integer.parseInt(coords[1].trim());
+                            int z = Integer.parseInt(coords[2].trim());
+                            Minecraft.mc.getLevel().setTile(x, y, z, 1);
+                        }
                         System.out.println("Server: " + response);
                     }
                 } catch (IOException e) {
