@@ -96,6 +96,13 @@ public class SocketClient implements Runnable {
                         break;
                     }
 
+                    case Packets.CONNECTION: {
+                        int type = in.readInt();
+                        String username = in.readUTF();
+                        Minecraft.mc.chat.addConnectionMessage(username, type);
+                        break;
+                    }
+
                     default:
                         System.err.println("Unknown packet: " + packetId);
                         break;

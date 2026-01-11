@@ -5,6 +5,7 @@ import client.Minecraft;
 import client.net.SocketClient;
 import org.lwjgl.input.Keyboard;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +30,6 @@ public class Chat {
         this.y = y;
         this.toggled = false;
         this.messages = new ArrayList<>();
-        messages.add(new ChatMessage("Test", "this is a test message 1"));
-
     }
 
     public void render(int dW, int dH) {
@@ -91,7 +90,11 @@ public class Chat {
             glEnable(GL_TEXTURE_2D);
 
             int msgTextY = (int) (boxTop-1);
-            fontRenderer.drawString("<" + msg.author + "> " + msg.message, 5, msgTextY, true);
+            if (msg.connectionMessage) {
+                fontRenderer.drawString(msg.author + " " + msg.message, 5, msgTextY, Color.YELLOW, true);
+            } else {
+                fontRenderer.drawString("<" + msg.author + "> " + msg.message, 5, msgTextY, true);
+            }
 
             offsetY -= lineHeight;
             if (offsetY < 0) break;
@@ -143,12 +146,20 @@ public class Chat {
         }
     }
 
+    public void addMessage(String author, String message) {
+        ChatMessage msg = new ChatMessage(author, message, false);
+        messages.add(msg);
 
+        if (messages.size() >= messageLimit) {
+            messages.remove(0);
+        }
+    }
 
+    public void addConnectionMessage(String player, int type) {
+        // 0 = connect, 1 = disconnect
+        String action = (type == 0) ? "joined" : "left";
 
-    public void addMessage(String author, String message)
-    {
-        ChatMessage msg = new ChatMessage(author, message);
+        ChatMessage msg = new ChatMessage(player, action + " the game", true);
         messages.add(msg);
 
         if (messages.size() >= messageLimit) {
@@ -160,11 +171,13 @@ public class Chat {
         public String author;
         public String message;
         public long timestamp;
+        public boolean connectionMessage;
 
-        public ChatMessage(String author, String message) {
+        public ChatMessage(String author, String message, boolean connectionMessage) {
             this.author = author;
             this.message = message;
             this.timestamp = System.currentTimeMillis();
+            this.connectionMessage = connectionMessage;
         }
     }
 

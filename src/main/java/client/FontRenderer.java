@@ -130,4 +130,27 @@ public class FontRenderer {
         glColor4f(1f, 1f, 1f, 1f);
         drawString(text, x, y);
     }
+
+    public void drawString(String text, int x, int y, Color color, boolean shadow) {
+        int shadowOffsetX = 2;
+        int shadowOffsetY = 2;
+
+        if (shadow) {
+            glColor4f(0f, 0f, 0f, 1f);
+            drawString(text, x + shadowOffsetX, y + shadowOffsetY);
+        }
+
+        drawString(text, x, y, color);
+    }
+
+    public void drawString(String text, int x, int y, Color color) {
+        if (color == null) color = Color.WHITE;
+        float r = color.getRed() / 255f;
+        float g = color.getGreen() / 255f;
+        float b = color.getBlue() / 255f;
+        float a = color.getAlpha() / 255f;
+
+        glColor4f(r, g, b, a);
+        drawString(text, x, y);
+    }
 }

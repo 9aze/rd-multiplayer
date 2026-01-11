@@ -78,6 +78,8 @@ public class Server {
                     clients.add(client);
 
                     System.out.println("client authenticated: " + username);
+                    broadcastConnection(0, client);
+
                     authenticated = true;
                 } else {
                     out.writeByte(Packets.AUTH_FAILED);
@@ -140,6 +142,9 @@ public class Server {
             }
 
         } catch (IOException e) {
+            if(client != null) {
+                broadcastConnection(1, client);
+            }
             System.out.println("client disconnected: " + (client != null ? client.getUsername() : "unknown"));
         } finally {
             if (client != null) clients.remove(client);
@@ -159,6 +164,7 @@ public class Server {
                     if (last == null) continue;
                     if (now - last > TIMEOUT_MS) {
                         System.out.println("Client timed out: " + client.getUsername());
+                        broadcastConnection(1, client);
                         try {
                             client.getSocket().close();
                         } catch (IOException ignored) {}
@@ -185,6 +191,19 @@ public class Server {
                 out.writeInt(x);
                 out.writeInt(y);
                 out.writeInt(z);
+                out.flush();
+            } catch (IOException ignored) {}
+        }
+    }
+
+    private static void broadcastConnection(int type, Client _client) {
+        for (Client client : clients) {
+            if(client == _client) return;
+            DataOutputStream out = client.getOut();
+            try {
+                out.writeByte(Packets.CONNECTION);
+                out.writeInt(type);
+                out.writeUTF(_client.getUsername());
                 out.flush();
             } catch (IOException ignored) {}
         }
