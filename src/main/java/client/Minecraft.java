@@ -49,6 +49,8 @@ public class Minecraft implements Runnable {
     public LevelRenderer levelRenderer;
     private Player player;
 
+    private int crosshairTex;
+
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
 
     /**
@@ -110,6 +112,8 @@ public class Minecraft implements Runnable {
         Display.create();
         Keyboard.create();
         Mouse.create();
+
+        crosshairTex = Textures.loadTexture("/client/crosshair.png", GL_NEAREST);
 
         // Setup rendering
         glEnable(GL_TEXTURE_2D);
@@ -408,6 +412,8 @@ public class Minecraft implements Runnable {
 
             glDisable(GL_FOG);
 
+            renderCrosshair();
+
         } else {
             glClearColor(0, 0, 0, 1);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -415,6 +421,50 @@ public class Minecraft implements Runnable {
 
         Display.update();
     }
+
+    private void renderCrosshair() {
+        int size = 16;
+        int x = width / 2 - size / 2;
+        int y = height / 2 - size / 2;
+
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, width, height, 0, -1, 1);
+
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(1f, 1f, 1f, 0.6f);
+
+        Textures.bind(crosshairTex);
+
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(x, y);
+        glTexCoord2f(1, 0); glVertex2f(x + size, y);
+        glTexCoord2f(1, 1); glVertex2f(x + size, y + size);
+        glTexCoord2f(0, 1); glVertex2f(x, y + size);
+        glEnd();
+
+        Textures.bind(0); //reset the bind shi otherwise it breaks
+
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+
+
 
 
     /**

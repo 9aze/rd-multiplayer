@@ -108,7 +108,7 @@ public class Player {
         boolean sprinting = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
         float speed = sprinting ? 0.08F : 0.04F; // sprintSpeed : groundSpeed
 
-        moveRelative(strafe, forward, this.onGround ? speed : 0.005F);
+        moveRelative(strafe, forward, this.onGround ? speed : 0.01F);
 
         // Apply gravity motion
         this.motionY -= 0.005D;
