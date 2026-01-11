@@ -6,6 +6,8 @@ import server.level.Level;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,6 +16,7 @@ public class Server {
     public static Level level;
 
     private static final Set<Client> clients = ConcurrentHashMap.newKeySet();
+    private static Map<Client, Long> lastKeepAlive = new HashMap<>();
 
     public static void main(String args[]) throws IOException {
         level = new Level(256, 256, 64);
@@ -26,6 +29,8 @@ public class Server {
 
         ServerSocket serverSocket = new ServerSocket(9090);
         System.out.println("server started...");
+
+        handleKeepalive();
 
         while (true) {
             Socket clientSocket = serverSocket.accept();
@@ -107,6 +112,15 @@ public class Server {
                         break;
                     }
 
+                    case Packets.KEEPALIVE: {
+                        lastKeepAlive.put(client, System.currentTimeMillis());
+                        long clientTime = in.readLong();
+                        out.writeByte(Packets.KEEPALIVE);
+                        out.writeLong(clientTime);
+                        out.flush();
+                        break;
+                    }
+
                     case Packets.REQUEST_LEVEL: {
                         sendLevel(out);
                         break;
@@ -133,6 +147,33 @@ public class Server {
                 socket.close();
             } catch (IOException ignored) {}
         }
+    }
+
+    private static void handleKeepalive() {
+        Thread timeoutThread = new Thread(() -> {
+            final long TIMEOUT_MS = 10000;
+            while (true) {
+                long now = System.currentTimeMillis();
+                for (Client client : clients) {
+                    Long last = lastKeepAlive.get(client);
+                    if (last == null) continue;
+                    if (now - last > TIMEOUT_MS) {
+                        System.out.println("Client timed out: " + client.getUsername());
+                        try {
+                            client.getSocket().close();
+                        } catch (IOException ignored) {}
+                        clients.remove(client);
+                        lastKeepAlive.remove(client);
+                    }
+                }
+                try {
+                    Thread.sleep(1_000);
+                } catch (InterruptedException ignored) {}
+            }
+        }, "ClientTimeoutChecker");
+
+        timeoutThread.setDaemon(true);
+        timeoutThread.start();
     }
 
 

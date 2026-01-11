@@ -89,6 +89,13 @@ public class SocketClient implements Runnable {
                         break;
                     }
 
+                    case Packets.KEEPALIVE: {
+                        long time = in.readLong();
+                        long now = System.currentTimeMillis();
+                        Minecraft.mc.rtt = now-time;
+                        break;
+                    }
+
                     default:
                         System.err.println("Unknown packet: " + packetId);
                         break;
@@ -105,6 +112,12 @@ public class SocketClient implements Runnable {
         out.writeInt(x);
         out.writeInt(y);
         out.writeInt(z);
+        out.flush();
+    }
+
+    public static void sendKeepalive(long timestamp) throws IOException {
+        out.writeByte(Packets.KEEPALIVE);
+        out.writeLong(timestamp);
         out.flush();
     }
 

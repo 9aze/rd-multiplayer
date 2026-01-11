@@ -46,6 +46,8 @@ public class Minecraft implements Runnable {
         GIT_HASH = hash;
     }
 
+    public long rtt;
+
     SocketClient socket = new SocketClient("localhost", 9090, username);
     Thread socketThread = new Thread(socket);
 
@@ -174,6 +176,8 @@ public class Minecraft implements Runnable {
                 Thread.sleep(50);
             } catch (InterruptedException ignored) {}
         }
+
+        keepAlive();
 
         try {
             // Initialize OpenGL immediately (dummy level)
@@ -454,6 +458,27 @@ public class Minecraft implements Runnable {
 
         Display.update();
     }
+
+    private void keepAlive() {
+        Thread keepAliveThread = new Thread(() -> {
+            while (true) {
+                try {
+                    if (socket.isConnected()) {
+                        long timestamp = System.currentTimeMillis();
+                        SocketClient.sendKeepalive(timestamp);
+                    }
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    break;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, "KeepAliveThread");
+        keepAliveThread.setDaemon(true);
+        keepAliveThread.start();
+    }
+
 
     /**
      * Entry point of the game

@@ -13,3 +13,4 @@ Work in progress...
 | 0x06 | REQUEST_LEVEL | C2S       | _none_                                                              | Client requests for level data.                        |
 | 0x07 | LEVEL_DATA    | S2C       | `int width, int height, int depth, int length, byte[length] blocks` | Server sends full level data.                          |
 | 0x07 | CHAT          | C2S / S2C | `utf8 author, utf8 message`                                         | Send a chat message. Server broadcasts to all clients. |
+| 0x07 | CHAT          | C2S / S2C | `utf8 author, utf8 message`                                         | Send a chat message. Server broadcasts to all clients. |

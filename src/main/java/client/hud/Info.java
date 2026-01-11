@@ -52,6 +52,7 @@ public class Info {
         Player player = Minecraft.mc.player;
         fontRenderer.drawString(String.format("XYZ: %.0f, %.0f, %.0f", player.x, player.y, player.z),5, 1, true);
         fontRenderer.drawString("FPS: " + Minecraft.mc.fps, 5, 21, true);
+        fontRenderer.drawString("PING: " + Minecraft.mc.rtt, 5, 41, true);
 
         Textures.bind(0); //reset the bind shi otherwise it breaks
 

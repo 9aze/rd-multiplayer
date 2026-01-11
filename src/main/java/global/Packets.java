@@ -9,4 +9,5 @@ public final class Packets {
     public static final byte REQUEST_LEVEL = 6;
     public static final byte LEVEL_DATA    = 7;
     public static final byte CHAT          = 8;
+    public static final byte KEEPALIVE     = 9;
 }
