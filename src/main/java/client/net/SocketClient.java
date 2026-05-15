@@ -2,7 +2,6 @@ package client.net;
 
 import client.Minecraft;
 import global.Packets;
-import server.Server;
 
 import java.io.*;
 import java.net.Socket;
@@ -100,6 +99,13 @@ public class SocketClient implements Runnable {
                         int type = in.readInt();
                         String username = in.readUTF();
                         Minecraft.mc.chat.addConnectionMessage(username, type);
+
+                        if(type == 1) {
+                            Minecraft.mc.getPlayerManager().removePlayer(username);
+                        } else {
+                            Minecraft.mc.player.sendPosition();
+                        }
+
                         break;
                     }
 
@@ -108,7 +114,8 @@ public class SocketClient implements Runnable {
                         double x = in.readDouble();
                         double y = in.readDouble();
                         double z = in.readDouble();
-                        Minecraft.mc.getPlayerManager().updatePlayer(username, x, y, z);
+                        float yaw = in.readFloat();
+                        Minecraft.mc.getPlayerManager().updatePlayer(username, x, y, z, yaw);
                         break;
                     }
 
@@ -131,11 +138,12 @@ public class SocketClient implements Runnable {
         out.flush();
     }
 
-    public static void sendPos(int packet, double x, double y, double z) throws IOException {
+    public static void sendPos(int packet, double x, double y, double z, float yaw) throws IOException {
         out.writeByte(packet);
         out.writeDouble(x);
         out.writeDouble(y);
         out.writeDouble(z);
+        out.writeFloat(yaw);
         out.flush();
     }
 

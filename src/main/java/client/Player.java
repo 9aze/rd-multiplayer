@@ -109,8 +109,7 @@ public class Player {
             }
         }
 
-
-        if(!Minecraft.mc.chat.toggled) {
+        if (!Minecraft.mc.chat.toggled) {
             // Player movement
             if (Keyboard.isKeyDown(Keyboard.KEY_W) || Keyboard.isKeyDown(Keyboard.KEY_UP)) forward--;
             if (Keyboard.isKeyDown(Keyboard.KEY_S) || Keyboard.isKeyDown(Keyboard.KEY_DOWN)) forward++;
@@ -123,7 +122,7 @@ public class Player {
         }
 
         boolean sprinting = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
-        float speed = sprinting ? 0.08F : 0.04F; // sprintSpeed : groundSpeed
+        float speed = sprinting ? 0.08F : 0.04F;
 
         moveRelative(strafe, forward, this.onGround ? speed : 0.01F);
 
@@ -144,8 +143,14 @@ public class Player {
             this.motionZ *= 0.8F;
         }
 
-        SocketClient.sendPos(Packets.POS, x, y, z);
+        if (this.x != this.prevX || this.y != this.prevY || this.z != this.prevZ) {
+            if (Minecraft.mc.socket.isConnected()) {
+                SocketClient.sendPos(Packets.POS, this.x, this.y, this.z, this.yRotation);
+            }
+
+        }
     }
+
 
     /**
      * Move player relative in level with collision check
@@ -221,5 +226,11 @@ public class Player {
         // Move the player in facing direction
         this.motionX += x * cos - z * sin;
         this.motionZ += z * cos + x * sin;
+    }
+
+    public void sendPosition() throws IOException {
+        if (Minecraft.mc.socket.isConnected()) {
+            SocketClient.sendPos(Packets.POS, this.x, this.y, this.z, this.yRotation);
+        }
     }
 }

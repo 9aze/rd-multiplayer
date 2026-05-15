@@ -139,7 +139,8 @@ public class Server {
                         double x = in.readDouble();
                         double y = in.readDouble();
                         double z = in.readDouble();
-                        broadcastPos(client, x, y, z);
+                        float yaw = in.readFloat();
+                        broadcastPos(client, x, y, z, yaw);
                         break;
                     }
 
@@ -230,7 +231,7 @@ public class Server {
         }
     }
 
-    private static void broadcastPos(Client _client, double x, double y, double z) {
+    private static void broadcastPos(Client _client, double x, double y, double z, float yaw) {
         for (Client client : clients) {
             if (client == _client) continue;
             DataOutputStream out = client.getOut();
@@ -240,6 +241,7 @@ public class Server {
                 out.writeDouble(x);
                 out.writeDouble(y);
                 out.writeDouble(z);
+                out.writeFloat(yaw);
                 out.flush();
             } catch (IOException ignored) {}
         }

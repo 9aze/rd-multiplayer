@@ -1,8 +1,11 @@
 package client.level;
 
-import client.HitResult;
-import client.Player;
+import client.*;
 import client.phys.AABB;
+import client.net.PlayerManager;
+import org.lwjgl.BufferUtils;
+
+import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -205,6 +208,74 @@ public class LevelRenderer implements LevelListener {
 
         // Disable blending
         glDisable(GL_BLEND);
+    }
+
+    public void renderPlayers(PlayerManager playerManager) {
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_FOG);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        for (Map.Entry<String, Position> entry : playerManager.getPlayers().entrySet()) {
+            Position pos = entry.getValue();
+            glPushMatrix();
+            glTranslatef((float) pos.x, (float) pos.y - 1.62f, (float) pos.z);
+            glRotatef(-pos.yaw, 0f, 1f, 0f);
+            this.tessellator.init();
+            renderPlayerModel();
+            this.tessellator.flush();
+            glPopMatrix();
+        }
+
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_FOG);
+        glEnable(GL_TEXTURE_2D);
+    }
+
+    private void renderPlayerModel() {
+        renderBox(-0.25f, 1.25f, -0.25f,  0.25f, 1.75f,  0.25f,  0.85f, 0.65f, 0.50f);
+        renderBox(-0.25f, 0.50f, -0.125f, 0.25f, 1.25f,  0.125f, 0.22f, 0.40f, 0.75f);
+        renderBox( 0.00f, 0.00f, -0.125f, 0.25f, 0.50f,  0.125f, 0.15f, 0.25f, 0.55f);
+        renderBox(-0.25f, 0.00f, -0.125f, 0.00f, 0.50f,  0.125f, 0.15f, 0.25f, 0.55f);
+        renderBox( 0.25f, 0.50f, -0.125f, 0.50f, 1.25f,  0.125f, 0.85f, 0.65f, 0.50f);
+        renderBox(-0.50f, 0.50f, -0.125f,-0.25f, 1.25f,  0.125f, 0.85f, 0.65f, 0.50f);
+    }
+
+    private void renderBox(float x0, float y0, float z0, float x1, float y1, float z1,
+                           float r, float g, float b) {
+        this.tessellator.color(r, g, b);
+
+        this.tessellator.vertex(x0, y0, z0);
+        this.tessellator.vertex(x1, y0, z0);
+        this.tessellator.vertex(x1, y0, z1);
+        this.tessellator.vertex(x0, y0, z1);
+
+        this.tessellator.vertex(x0, y1, z0);
+        this.tessellator.vertex(x1, y1, z0);
+        this.tessellator.vertex(x1, y1, z1);
+        this.tessellator.vertex(x0, y1, z1);
+
+        this.tessellator.vertex(x0, y0, z0);
+        this.tessellator.vertex(x1, y0, z0);
+        this.tessellator.vertex(x1, y1, z0);
+        this.tessellator.vertex(x0, y1, z0);
+
+        this.tessellator.vertex(x0, y0, z1);
+        this.tessellator.vertex(x1, y0, z1);
+        this.tessellator.vertex(x1, y1, z1);
+        this.tessellator.vertex(x0, y1, z1);
+
+        this.tessellator.vertex(x0, y0, z0);
+        this.tessellator.vertex(x0, y1, z0);
+        this.tessellator.vertex(x0, y1, z1);
+        this.tessellator.vertex(x0, y0, z1);
+
+        this.tessellator.vertex(x1, y0, z0);
+        this.tessellator.vertex(x1, y1, z0);
+        this.tessellator.vertex(x1, y1, z1);
+        this.tessellator.vertex(x1, y0, z1);
     }
 
     @Override

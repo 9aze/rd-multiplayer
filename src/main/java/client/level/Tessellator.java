@@ -87,6 +87,7 @@ public class Tessellator {
     public void flush() {
         this.vertexBuffer.flip();
         this.textureCoordinateBuffer.flip();
+        this.colorBuffer.flip();
 
         // Set points
         glVertexPointer(3, GL_POINTS, this.vertexBuffer);
@@ -126,8 +127,8 @@ public class Tessellator {
     private void clear() {
         this.vertexBuffer.clear();
         this.textureCoordinateBuffer.clear();
+        this.colorBuffer.clear();
         this.vertices = 0;
-
         this.hasTexture = false;
         this.hasColor = false;
     }

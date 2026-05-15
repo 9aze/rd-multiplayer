@@ -445,6 +445,7 @@ public class Minecraft implements Runnable {
             levelRenderer.render(0);
             glEnable(GL_FOG);
             levelRenderer.render(1);
+            levelRenderer.renderPlayers(Minecraft.mc.getPlayerManager());
             glDisable(GL_TEXTURE_2D);
 
             if (hitResult != null)

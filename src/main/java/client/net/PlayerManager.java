@@ -9,18 +9,14 @@ public class PlayerManager {
 
     public Map<String, Position> players = new HashMap<>();
 
-    public void updatePlayer(String username, double x, double y, double z) {
+    public void updatePlayer(String username, double x, double y, double z, float yaw) {
         if (players.containsKey(username)) {
-            players.get(username).x = x;
-            players.get(username).y = y;
-            players.get(username).z = z;
+            Position p = players.get(username);
+            p.x = x; p.y = y; p.z = z; p.yaw = yaw;
         } else {
-            players.put(username, new Position(x, y, z));
+            players.put(username, new Position(x, y, z, yaw));
         }
-
-        System.out.println("Player " + username + " is at X/Y/Z: " + x + ", " + y + ", " + z);
     }
-
 
     public void removePlayer(String username) {
         players.remove(username);
