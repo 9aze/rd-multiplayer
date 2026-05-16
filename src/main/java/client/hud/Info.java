@@ -37,7 +37,7 @@ public class Info {
 
     public void tickKeys() {
         for (int i = 0; i < HOTBAR_KEYS.length; i++) {
-            if (Keyboard.isKeyDown(HOTBAR_KEYS[i])) {
+            if (Keyboard.isKeyDown(HOTBAR_KEYS[i]) && !Minecraft.mc.chat.toggled) {
                 selectedSlot = i;
                 break;
             }
