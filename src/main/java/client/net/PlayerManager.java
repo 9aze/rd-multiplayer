@@ -9,16 +9,27 @@ public class PlayerManager {
 
     public Map<String, Position> players = new HashMap<>();
 
-    public void updatePlayer(String username, double x, double y, double z, float yaw, int ping) {
-        if (players.containsKey(username)) {
-            Position p = players.get(username);
-            p.x = x; p.y = y; p.z = z; p.yaw = yaw; p.ping = ping;
-        } else {
-            players.put(username, new Position(x, y, z, yaw, ping));
+    public synchronized void updatePlayer(String username, double x, double y, double z,
+                                          float yaw, float pitch, int ping) {
+        Position p = players.get(username);
+        if (p == null) {
+            p = new Position(x, y, z, yaw, ping);
+            players.put(username, p);
         }
+        p.x = x; p.y = y; p.z = z;
+        p.yaw = yaw; p.pitch = pitch; p.ping = ping;
     }
 
-    public void removePlayer(String username) {
+    public synchronized void setPendingSkin(String username, byte[] png) {
+        Position p = players.get(username);
+        if (p == null) {
+            p = new Position(0, 0, 0, 0f, 0);
+            players.put(username, p);
+        }
+        p.pendingSkinPng = png;
+    }
+
+    public synchronized void removePlayer(String username) {
         players.remove(username);
     }
 

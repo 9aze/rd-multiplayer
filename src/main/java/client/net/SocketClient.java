@@ -7,6 +7,9 @@ import global.Packets;
 import java.awt.*;
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SocketClient implements Runnable {
@@ -67,6 +70,8 @@ public class SocketClient implements Runnable {
             System.out.println("Authenticated successfully as " + username);
             setLoading("Authentication successful!", Color.GREEN);
             authenticated = true;
+
+            uploadSkinIfPresent();
 
             setLoading("Requesting level...", Color.WHITE);
             out.writeByte(Packets.REQUEST_LEVEL);
@@ -145,8 +150,9 @@ public class SocketClient implements Runnable {
                         String uname = in.readUTF();
                         double x = in.readDouble(), y = in.readDouble(), z = in.readDouble();
                         float yaw = in.readFloat();
+                        float pitch = in.readFloat();
                         int ping = in.readInt();
-                        Minecraft.mc.getPlayerManager().updatePlayer(uname, x, y, z, yaw, ping);
+                        Minecraft.mc.getPlayerManager().updatePlayer(uname, x, y, z, yaw, pitch, ping);
                         break;
                     }
 
@@ -172,6 +178,15 @@ public class SocketClient implements Runnable {
                         } else {
                             if (Minecraft.mc.player != null) Minecraft.mc.player.sendPosition();
                         }
+                        break;
+                    }
+
+                    case Packets.SKIN_DATA: {
+                        String uname = in.readUTF();
+                        int len = in.readInt();
+                        byte[] png = new byte[len];
+                        in.readFully(png);
+                        Minecraft.mc.getPlayerManager().setPendingSkin(uname, png);
                         break;
                     }
 
@@ -201,12 +216,12 @@ public class SocketClient implements Runnable {
         sendBlock(packet, x, y, z, 0);
     }
 
-    public static void sendPos(int packet, double x, double y, double z, float yaw, int ping)
+    public static void sendPos(int packet, double x, double y, double z, float yaw, float pitch, int ping)
             throws IOException {
         synchronized (writeLock) {
             out.writeByte(packet);
             out.writeDouble(x); out.writeDouble(y); out.writeDouble(z);
-            out.writeFloat(yaw); out.writeInt(ping);
+            out.writeFloat(yaw); out.writeFloat(pitch); out.writeInt(ping);
             out.flush();
         }
     }
@@ -225,6 +240,27 @@ public class SocketClient implements Runnable {
             out.writeUTF(author);
             out.writeUTF(message);
             out.flush();
+        }
+    }
+
+    public static void sendSkin(byte[] png) throws IOException {
+        synchronized (writeLock) {
+            out.writeByte(Packets.SKIN_UPLOAD);
+            out.writeInt(png.length);
+            out.write(png);
+            out.flush();
+        }
+    }
+
+    private void uploadSkinIfPresent() {
+        Path p = Paths.get("rd-skin.png");
+        if (!Files.exists(p)) return;
+        try {
+            byte[] png = Files.readAllBytes(p);
+            sendSkin(png);
+            System.out.println("Uploaded skin from " + p + " (" + png.length + " bytes)");
+        } catch (IOException e) {
+            System.err.println("Failed to read/upload rd-skin.png: " + e.getMessage());
         }
     }
 

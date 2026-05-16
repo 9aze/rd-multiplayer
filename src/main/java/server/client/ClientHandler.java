@@ -18,8 +18,7 @@ public class ClientHandler {
     private static final int MIN_USERNAME_LENGTH = 3;
     private static final int MAX_MESSAGE_LENGTH  = 256;
     private static final int MAX_BLOCK_ID = 9;
-
-    static long lastChatTime = 0L;
+    private static final int MAX_SKIN_BYTES = 64 * 1024;
 
     public static void handle(Socket socket) {
         DataInputStream in = null;
@@ -85,6 +84,19 @@ public class ClientHandler {
             System.out.println("Client authenticated: " + username);
             Broadcaster.broadcastConnection(0, client);
 
+            // Send all currently-known skins to the new client so they see
+            // everyone correctly from the start.
+            for (java.util.Map.Entry<String, byte[]> e : Server.skins.entrySet()) {
+                final String uname = e.getKey();
+                final byte[] png   = e.getValue();
+                client.send(o -> {
+                    o.writeByte(Packets.SKIN_DATA);
+                    o.writeUTF(uname);
+                    o.writeInt(png.length);
+                    o.write(png);
+                });
+            }
+
             while (true) {
                 packetId = in.readByte();
 
@@ -127,18 +139,6 @@ public class ClientHandler {
 
                         if (!AntiCheat.checkBlock(client, x, y, z, true, System.currentTimeMillis())) break;
 
-                        int existingId = Server.level.getTile(x, y, z) & 0xFF;
-                        if (existingId != 0) {
-                            final int fx = x, fy = y, fz = z, fid = existingId;
-                            final Client c = client;
-                            c.send(o -> {
-                                o.writeByte(Packets.BLOCK_PLACE);
-                                o.writeInt(fx); o.writeInt(fy); o.writeInt(fz);
-                                o.writeByte(fid);
-                            });
-                            break;
-                        }
-
                         Server.level.setTile(x, y, z, blockId);
                         Broadcaster.broadcastBlock(Packets.BLOCK_PLACE, x, y, z, blockId);
 
@@ -149,10 +149,11 @@ public class ClientHandler {
                     }
 
                     case Packets.POS: {
-                        double x   = in.readDouble();
-                        double y   = in.readDouble();
-                        double z   = in.readDouble();
-                        float  yaw = in.readFloat();
+                        double x    = in.readDouble();
+                        double y    = in.readDouble();
+                        double z    = in.readDouble();
+                        float  yaw   = in.readFloat();
+                        float  pitch = in.readFloat();
                         int    ping = in.readInt();
 
                         long now = System.currentTimeMillis();
@@ -174,7 +175,7 @@ public class ClientHandler {
                         final Client c = client;
                         c.send(o -> chunkTracker.update(fx, fz, o));
 
-                        Broadcaster.broadcastPos(client, x, y, z, yaw, ping);
+                        Broadcaster.broadcastPos(client, x, y, z, yaw, pitch, ping);
                         break;
                     }
 
@@ -190,10 +191,6 @@ public class ClientHandler {
                     }
 
                     case Packets.CHAT: {
-                        long now = System.currentTimeMillis();
-                        if (now - lastChatTime < Server.CHAT_DELAY) break;
-                        lastChatTime = now;
-
                         in.readUTF();
                         String message = in.readUTF().trim();
 
@@ -204,6 +201,22 @@ public class ClientHandler {
                         final String author  = client.getUsername();
                         final String payload = message;
                         Broadcaster.broadcastChat(author, payload);
+                        break;
+                    }
+
+                    case Packets.SKIN_UPLOAD: {
+                        int len = in.readInt();
+                        if (len < 0 || len > MAX_SKIN_BYTES) {
+                            System.out.println("Rejected SKIN_UPLOAD from "
+                                    + client.getUsername() + ": invalid length " + len);
+                            // Drain so the stream stays aligned, then ignore.
+                            if (len > 0 && len <= 10 * 1024 * 1024) in.skipBytes(len);
+                            break;
+                        }
+                        byte[] png = new byte[len];
+                        in.readFully(png);
+                        Server.skins.put(client.getUsername(), png);
+                        Broadcaster.broadcastSkin(client.getUsername(), png);
                         break;
                     }
 
@@ -222,6 +235,7 @@ public class ClientHandler {
             if (client != null) {
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
+                Server.skins.remove(client.getUsername());
                 client.close();
             } else {
                 try { socket.close(); } catch (IOException ignored) {}

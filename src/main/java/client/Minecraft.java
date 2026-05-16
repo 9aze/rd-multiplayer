@@ -269,7 +269,6 @@ public class Minecraft implements Runnable {
     private void moveCameraToPlayer(float pt) {
         glTranslatef(0f, 0f, -0.3f);
 
-        // Pull the camera back along the player's view in 3rd/2nd person.
         if (cameraMode != CAMERA_FIRST) {
             glTranslatef(0f, 0f, -CAMERA_DISTANCE);
         }
@@ -277,8 +276,6 @@ public class Minecraft implements Runnable {
         glRotatef(player.xRotation, 1f, 0f, 0f);
         glRotatef(player.yRotation, 0f, 1f, 0f);
 
-        // 2nd person: flip the world 180° around the player's vertical axis so
-        // the camera ends up in front of the player, looking back at them.
         if (cameraMode == CAMERA_SECOND) {
             glRotatef(180f, 0f, 1f, 0f);
         }
@@ -310,9 +307,6 @@ public class Minecraft implements Runnable {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        // Always pick from the player's actual eye, never from the offset 3rd/2nd
-        // person camera — otherwise you'd target blocks based on where the camera
-        // is, not where the player would reach.
         int saved = cameraMode;
         cameraMode = CAMERA_FIRST;
         moveCameraToPlayer(pt);
@@ -405,7 +399,7 @@ public class Minecraft implements Runnable {
             levelRenderer.render(1);
             levelRenderer.renderPlayers(playerManager);
             if (cameraMode != CAMERA_FIRST) {
-                levelRenderer.renderSelf(player);
+                levelRenderer.renderSelf(player, playerManager);
             }
             levelRenderer.renderNameTags(playerManager, player, font);
             glDisable(GL_TEXTURE_2D);

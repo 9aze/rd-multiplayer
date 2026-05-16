@@ -15,4 +15,6 @@ public final class Packets {
     public static final byte SET_POS       = 12;
     public static final byte CHUNK_DATA    = 13;
     public static final byte CHUNK_UNLOAD  = 14;
+    public static final byte SKIN_UPLOAD   = 15;
+    public static final byte SKIN_DATA     = 16;
 }

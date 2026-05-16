@@ -19,6 +19,9 @@ public class Player {
     public float width, height;
     public float xRotation, yRotation;
 
+    private float lastSentYaw, lastSentPitch;
+    private boolean rotationSentOnce;
+
     private boolean onGround;
 
     public AABB boundingBox;
@@ -116,10 +119,6 @@ public class Player {
                     return;
                 }
 
-                if (key == Keyboard.KEY_F5 && !Minecraft.mc.chat.toggled) {
-                    Minecraft.mc.cycleCamera();
-                }
-
                 if (key == Keyboard.KEY_SPACE && !Minecraft.mc.chat.toggled) {
                     long now = System.currentTimeMillis();
 
@@ -197,10 +196,17 @@ public class Player {
             }
         }
 
-        if (this.x != this.prevX || this.y != this.prevY || this.z != this.prevZ) {
-            if (Minecraft.mc.socket.isConnected()) {
-                SocketClient.sendPos(Packets.POS, this.x, this.y, this.z, this.yRotation, (int) Minecraft.mc.rtt);
-            }
+        boolean moved = this.x != this.prevX || this.y != this.prevY || this.z != this.prevZ;
+        boolean rotated = !rotationSentOnce
+                || this.yRotation != lastSentYaw
+                || this.xRotation != lastSentPitch;
+
+        if ((moved || rotated) && Minecraft.mc.socket.isConnected()) {
+            SocketClient.sendPos(Packets.POS, this.x, this.y, this.z,
+                    this.yRotation, this.xRotation, (int) Minecraft.mc.rtt);
+            lastSentYaw = this.yRotation;
+            lastSentPitch = this.xRotation;
+            rotationSentOnce = true;
         }
     }
 
@@ -259,7 +265,8 @@ public class Player {
 
     public void sendPosition() throws IOException {
         if (Minecraft.mc.socket.isConnected()) {
-            SocketClient.sendPos(Packets.POS, this.x, this.y, this.z, this.yRotation, (int) Minecraft.mc.rtt);
+            SocketClient.sendPos(Packets.POS, this.x, this.y, this.z,
+                    this.yRotation, this.xRotation, (int) Minecraft.mc.rtt);
         }
     }
 }

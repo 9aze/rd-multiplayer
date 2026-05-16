@@ -205,53 +205,123 @@ public class LevelRenderer implements LevelListener {
     }
 
     public void renderPlayers(PlayerManager playerManager) {
-        glDisable(GL_TEXTURE_2D); glDisable(GL_CULL_FACE); glDisable(GL_FOG);
-        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
         long now = System.currentTimeMillis();
 
-        for (Map.Entry<String, client.Position> entry : playerManager.getPlayers().entrySet()) {
+        java.util.List<java.util.Map.Entry<String, client.Position>> snapshot;
+        synchronized (playerManager) {
+            snapshot = new java.util.ArrayList<>(playerManager.getPlayers().entrySet());
+        }
+
+        glDisable(GL_CULL_FACE); glDisable(GL_FOG);
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        for (java.util.Map.Entry<String, client.Position> entry : snapshot) {
             client.Position pos = entry.getValue();
+            uploadPendingSkin(pos);
             updateAnimation(pos, now);
 
+            bindPlayerSkin(pos.skinTextureId);
             glPushMatrix();
             glTranslatef((float) pos.x, (float) pos.y - 1.62f, (float) pos.z);
             glRotatef(-pos.yaw, 0f, 1f, 0f);
-            renderPlayerModel(pos.limbSwing, pos.limbSwingAmount);
+            renderPlayerModel(pos.limbSwing, pos.limbSwingAmount, pos.pitch, pos.skinTextureId);
             glPopMatrix();
         }
 
+        Textures.bind(0);
         glDisable(GL_BLEND); glEnable(GL_CULL_FACE); glEnable(GL_FOG); glEnable(GL_TEXTURE_2D);
     }
 
-    /** Animation state for the local player, kept across frames. */
     private final client.Position selfPosition = new client.Position(0, 0, 0, 0f, 0);
 
-    /**
-     * Render the local player. Called by {@link client.Minecraft} only when the
-     * camera is in 3rd / 2nd person — in 1st person the model would clip into
-     * the camera.
-     */
-    public void renderSelf(Player p) {
-        // Mirror live player data into the persistent animation Position.
+    public void renderSelf(Player p, PlayerManager playerManager) {
         selfPosition.x = p.x;
         selfPosition.y = p.y;
         selfPosition.z = p.z;
         selfPosition.yaw = p.yRotation;
+        selfPosition.pitch = p.xRotation;
+
+        client.Position mine;
+        synchronized (playerManager) {
+            mine = playerManager.getPlayers().get(client.Minecraft.mc.username);
+        }
+        if (mine != null) {
+            if (mine.pendingSkinPng != null) {
+                selfPosition.pendingSkinPng = mine.pendingSkinPng;
+                mine.pendingSkinPng = null;
+            }
+            if (mine.skinTextureId != -1) {
+                selfPosition.skinTextureId = mine.skinTextureId;
+            }
+        }
+        uploadPendingSkin(selfPosition);
 
         long now = System.currentTimeMillis();
         updateAnimation(selfPosition, now);
 
-        glDisable(GL_TEXTURE_2D); glDisable(GL_CULL_FACE); glDisable(GL_FOG);
+        glDisable(GL_CULL_FACE); glDisable(GL_FOG);
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        bindPlayerSkin(selfPosition.skinTextureId);
         glPushMatrix();
         glTranslatef((float) p.x, (float) p.y - 1.62f, (float) p.z);
         glRotatef(-p.yRotation, 0f, 1f, 0f);
-        renderPlayerModel(selfPosition.limbSwing, selfPosition.limbSwingAmount);
+        renderPlayerModel(selfPosition.limbSwing, selfPosition.limbSwingAmount,
+                          selfPosition.pitch, selfPosition.skinTextureId);
         glPopMatrix();
 
+        Textures.bind(0);
         glDisable(GL_BLEND); glEnable(GL_CULL_FACE); glEnable(GL_FOG); glEnable(GL_TEXTURE_2D);
+    }
+
+    private void bindPlayerSkin(int skinTextureId) {
+        if (skinTextureId != -1) {
+            glEnable(GL_TEXTURE_2D);
+            Textures.bind(skinTextureId);
+        } else {
+            glDisable(GL_TEXTURE_2D);
+        }
+    }
+
+    private void uploadPendingSkin(client.Position pos) {
+        byte[] png = pos.pendingSkinPng;
+        if (png == null) return;
+        pos.pendingSkinPng = null;
+
+        try {
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
+                    new java.io.ByteArrayInputStream(png));
+            if (img == null) {
+                System.err.println("Skin upload failed: ImageIO returned null");
+                return;
+            }
+            int w = img.getWidth(), h = img.getHeight();
+            if (!((w == 64 && h == 64) || (w == 64 && h == 32))) {
+                System.err.println("Skin upload rejected: bad size " + w + "x" + h);
+                return;
+            }
+
+            int[] pixels = new int[w * h];
+            img.getRGB(0, 0, w, h, pixels, 0, w);
+            for (int i = 0; i < pixels.length; i++) {
+                int a = (pixels[i] >> 24) & 0xFF;
+                int r = (pixels[i] >> 16) & 0xFF;
+                int g = (pixels[i] >>  8) & 0xFF;
+                int b =  pixels[i] & 0xFF;
+                pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
+            }
+            java.nio.ByteBuffer buf = org.lwjgl.BufferUtils.createByteBuffer(w * h * 4);
+            buf.asIntBuffer().put(pixels);
+
+            int id = (pos.skinTextureId != -1) ? pos.skinTextureId : glGenTextures();
+            glBindTexture(GL_TEXTURE_2D, id);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            pos.skinTextureId = id;
+        } catch (Exception e) {
+            System.err.println("Skin decode/upload failed: " + e.getMessage());
+        }
     }
 
     /** Walk-cycle constants — tune to taste. */
@@ -285,51 +355,129 @@ public class LevelRenderer implements LevelListener {
         pos.lastAnimTime = now;
     }
 
-    private void renderPlayerModel(float limbSwing, float limbSwingAmount) {
-        // Static parts (head + face details + body) share the player's base
-        // transform, so they all go in one batched tessellator call.
-        tessellator.init();
-        renderBox(-0.25f, 1.25f, -0.25f,  0.25f, 1.75f,  0.25f,  0.85f, 0.65f, 0.50f); // head
-        renderBox(-0.25f, 0.50f, -0.125f, 0.25f, 1.25f,  0.125f, 0.22f, 0.40f, 0.75f); // body
-        renderPlayerFace();
-        tessellator.flush();
-
+    private void renderPlayerModel(float limbSwing, float limbSwingAmount, float pitch, int skin) {
         float swing = (float) Math.sin(limbSwing) * SWING_AMP * limbSwingAmount;
         float swingDeg = (float) Math.toDegrees(swing);
 
-        // Right leg — pivots at hip (top of leg, y = 0.50).
-        renderLimb( 0.00f, 0.00f, -0.125f, 0.25f, 0.50f, 0.125f,
-                    0.15f, 0.25f, 0.55f,  0.50f,  swingDeg);
+        boolean textured = skin != -1;
+
+        // Body — stationary, batched on its own.
+        tessellator.init();
+        if (textured) {
+            renderSkinBox(-0.25f, 0.60f, -0.125f, 0.25f, 1.35f, 0.125f,
+                          client.SkinModel.BODY);
+        } else {
+            renderBox(-0.25f, 0.60f, -0.125f, 0.25f, 1.35f, 0.125f, 0.22f, 0.40f, 0.75f);
+        }
+        tessellator.flush();
+
+        // Body outer (jacket) — slightly larger, transparent. Skin only.
+        if (textured) {
+            glDepthMask(false);
+            tessellator.init();
+            renderSkinBoxScaled(-0.25f, 0.60f, -0.125f, 0.25f, 1.35f, 0.125f,
+                                client.SkinModel.BODY_OUTER, 0.03125f);
+            tessellator.flush();
+            glDepthMask(true);
+        }
+
+        // Head pivots at the top of the body (y = 1.35). Yaw is already
+        // applied at the parent transform; here we just add pitch.
+        renderHead(textured ? skin : -1, pitch);
+
+        // Right leg — pivots at hip (top of leg, y = 0.60).
+        renderLimbBox( 0.00f, 0.00f, -0.125f, 0.25f, 0.60f, 0.125f,
+                       textured ? client.SkinModel.R_LEG : null,
+                       textured ? client.SkinModel.R_LEG_OUTER : null,
+                       0.15f, 0.25f, 0.55f,  0.60f,  swingDeg);
 
         // Left leg — opposite phase.
-        renderLimb(-0.25f, 0.00f, -0.125f, 0.00f, 0.50f, 0.125f,
-                    0.15f, 0.25f, 0.55f,  0.50f, -swingDeg);
+        renderLimbBox(-0.25f, 0.00f, -0.125f, 0.00f, 0.60f, 0.125f,
+                       textured ? client.SkinModel.L_LEG : null,
+                       textured ? client.SkinModel.L_LEG_OUTER : null,
+                       0.15f, 0.25f, 0.55f,  0.60f, -swingDeg);
 
-        // Right arm — pivots at shoulder (top of arm, y = 1.25).
-        renderLimb( 0.25f, 0.50f, -0.125f, 0.50f, 1.25f, 0.125f,
-                    0.85f, 0.65f, 0.50f,  1.25f, -swingDeg);
+        // Right arm — pivots at shoulder (top of arm, y = 1.35).
+        // Width 0.1875 (= 3 vanilla pixels, "slim" arm), inner edge flush with body.
+        renderLimbBox( 0.25f, 0.60f, -0.125f, 0.4375f, 1.35f, 0.125f,
+                       textured ? client.SkinModel.R_ARM : null,
+                       textured ? client.SkinModel.R_ARM_OUTER : null,
+                       0.85f, 0.65f, 0.50f,  1.35f, -swingDeg);
 
         // Left arm — same phase as right leg.
-        renderLimb(-0.50f, 0.50f, -0.125f,-0.25f, 1.25f, 0.125f,
-                    0.85f, 0.65f, 0.50f,  1.25f,  swingDeg);
+        renderLimbBox(-0.4375f, 0.60f, -0.125f,-0.25f, 1.35f, 0.125f,
+                       textured ? client.SkinModel.L_ARM : null,
+                       textured ? client.SkinModel.L_ARM_OUTER : null,
+                       0.85f, 0.65f, 0.50f,  1.35f,  swingDeg);
+    }
+
+    private void renderHead(int skin, float pitch) {
+        float pivotY = 1.35f;
+        // Clamp pitch (anti-cheat already caps at ±90 but be safe).
+        float p = Math.max(-90f, Math.min(90f, pitch));
+
+        glPushMatrix();
+        glTranslatef(0f, pivotY, 0f);
+        // xRotation is the camera's world-rotation angle; positive means the
+        // camera is looking *down* (the world tilts up around the camera).
+        // To make the head model tilt the same way the player is looking,
+        // we apply the opposite sign.
+        glRotatef(-p, 1f, 0f, 0f);
+        glTranslatef(0f, -pivotY, 0f);
+
+        tessellator.init();
+        if (skin != -1) {
+            renderSkinBox(-0.25f, 1.35f, -0.25f, 0.25f, 1.85f, 0.25f,
+                          client.SkinModel.HEAD);
+        } else {
+            renderBox(-0.25f, 1.35f, -0.25f,  0.25f, 1.85f,  0.25f,  0.85f, 0.65f, 0.50f);
+            renderPlayerFace();
+        }
+        tessellator.flush();
+
+        // Hat layer (head outer) — slightly larger, transparent.
+        if (skin != -1) {
+            glDepthMask(false);
+            tessellator.init();
+            renderSkinBoxScaled(-0.25f, 1.35f, -0.25f, 0.25f, 1.85f, 0.25f,
+                                client.SkinModel.HEAD_HAT, 0.0625f);
+            tessellator.flush();
+            glDepthMask(true);
+        }
+
+        glPopMatrix();
     }
 
     /**
-     * Render a box rotated around the X axis at {@code pivotY}.
-     * Each limb is its own tessellator batch because the matrix differs per limb.
+     * Render an animated limb (leg or arm) — rotates the box around its
+     * top (pivotY) so it swings about the hip/shoulder. Uses skin textures
+     * if {@code uvBase} is non-null, otherwise falls back to flat color (r,g,b).
      */
-    private void renderLimb(float x0, float y0, float z0,
-                            float x1, float y1, float z1,
-                            float r,  float g,  float b,
-                            float pivotY, float angleDeg) {
+    private void renderLimbBox(float x0, float y0, float z0,
+                               float x1, float y1, float z1,
+                               float[][] uvBase, float[][] uvOuter,
+                               float r,  float g,  float b,
+                               float pivotY, float angleDeg) {
         glPushMatrix();
         glTranslatef(0f, pivotY, 0f);
         glRotatef(angleDeg, 1f, 0f, 0f);
         glTranslatef(0f, -pivotY, 0f);
 
         tessellator.init();
-        renderBox(x0, y0, z0, x1, y1, z1, r, g, b);
+        if (uvBase != null) {
+            renderSkinBox(x0, y0, z0, x1, y1, z1, uvBase);
+        } else {
+            renderBox(x0, y0, z0, x1, y1, z1, r, g, b);
+        }
         tessellator.flush();
+
+        if (uvOuter != null) {
+            glDepthMask(false);
+            tessellator.init();
+            renderSkinBoxScaled(x0, y0, z0, x1, y1, z1, uvOuter, 0.03125f);
+            tessellator.flush();
+            glDepthMask(true);
+        }
 
         glPopMatrix();
     }
@@ -337,11 +485,11 @@ public class LevelRenderer implements LevelListener {
     private void renderPlayerFace() {
         float z = -0.251f;
 
-        renderFaceQuad(-0.15f, 1.62f, -0.03f, 1.55f, z,  1.0f, 1.0f, 1.0f);
-        renderFaceQuad( 0.03f, 1.62f,  0.15f, 1.55f, z,  1.0f, 1.0f, 1.0f);
-        renderFaceQuad(-0.13f, 1.60f, -0.07f, 1.56f, z,  0.08f, 0.08f, 0.08f);
-        renderFaceQuad( 0.07f, 1.60f,  0.13f, 1.56f, z,  0.08f, 0.08f, 0.08f);
-        renderFaceQuad(-0.10f, 1.37f,  0.10f, 1.34f, z,  0.25f, 0.08f, 0.08f);
+        renderFaceQuad(-0.15f, 1.72f, -0.03f, 1.65f, z,  1.0f, 1.0f, 1.0f);
+        renderFaceQuad( 0.03f, 1.72f,  0.15f, 1.65f, z,  1.0f, 1.0f, 1.0f);
+        renderFaceQuad(-0.13f, 1.70f, -0.07f, 1.66f, z,  0.08f, 0.08f, 0.08f);
+        renderFaceQuad( 0.07f, 1.70f,  0.13f, 1.66f, z,  0.08f, 0.08f, 0.08f);
+        renderFaceQuad(-0.10f, 1.47f,  0.10f, 1.44f, z,  0.25f, 0.08f, 0.08f);
     }
 
     private void renderFaceQuad(float x0, float y0, float x1, float y1, float z,
@@ -369,6 +517,64 @@ public class LevelRenderer implements LevelListener {
         tessellator.vertex(x1, y0, z0); tessellator.vertex(x1, y1, z0);
         tessellator.vertex(x1, y1, z1); tessellator.vertex(x1, y0, z1);
     }
+
+    /**
+     * Render a textured box using a {@link client.SkinModel}-style UV table.
+     * Vertex emission order matches {@link #renderBox}; UVs per corner per
+     * face are picked so the standard Minecraft skin unwrap maps correctly.
+     */
+    private void renderSkinBox(float x0, float y0, float z0,
+                               float x1, float y1, float z1,
+                               float[][] uv) {
+        tessellator.color(1f, 1f, 1f);
+
+        // BOTTOM (-Y) — face 0
+        float u0 = uv[0][0], v0 = uv[0][1], u1 = uv[0][2], v1 = uv[0][3];
+        tessellator.texture(u0, v0); tessellator.vertex(x0, y0, z0);
+        tessellator.texture(u1, v0); tessellator.vertex(x1, y0, z0);
+        tessellator.texture(u1, v1); tessellator.vertex(x1, y0, z1);
+        tessellator.texture(u0, v1); tessellator.vertex(x0, y0, z1);
+
+        // TOP (+Y) — face 1
+        u0 = uv[1][0]; v0 = uv[1][1]; u1 = uv[1][2]; v1 = uv[1][3];
+        tessellator.texture(u0, v1); tessellator.vertex(x0, y1, z0);
+        tessellator.texture(u1, v1); tessellator.vertex(x1, y1, z0);
+        tessellator.texture(u1, v0); tessellator.vertex(x1, y1, z1);
+        tessellator.texture(u0, v0); tessellator.vertex(x0, y1, z1);
+
+        // NORTH (-Z) — face 2 (player's front)
+        u0 = uv[2][0]; v0 = uv[2][1]; u1 = uv[2][2]; v1 = uv[2][3];
+        tessellator.texture(u1, v1); tessellator.vertex(x0, y0, z0);
+        tessellator.texture(u0, v1); tessellator.vertex(x1, y0, z0);
+        tessellator.texture(u0, v0); tessellator.vertex(x1, y1, z0);
+        tessellator.texture(u1, v0); tessellator.vertex(x0, y1, z0);
+
+        // SOUTH (+Z) — face 3 (player's back)
+        u0 = uv[3][0]; v0 = uv[3][1]; u1 = uv[3][2]; v1 = uv[3][3];
+        tessellator.texture(u0, v1); tessellator.vertex(x0, y0, z1);
+        tessellator.texture(u1, v1); tessellator.vertex(x1, y0, z1);
+        tessellator.texture(u1, v0); tessellator.vertex(x1, y1, z1);
+        tessellator.texture(u0, v0); tessellator.vertex(x0, y1, z1);
+
+        // WEST (-X) — face 4 (player's left side)
+        u0 = uv[4][0]; v0 = uv[4][1]; u1 = uv[4][2]; v1 = uv[4][3];
+        tessellator.texture(u0, v1); tessellator.vertex(x0, y0, z0);
+        tessellator.texture(u0, v0); tessellator.vertex(x0, y1, z0);
+        tessellator.texture(u1, v0); tessellator.vertex(x0, y1, z1);
+        tessellator.texture(u1, v1); tessellator.vertex(x0, y0, z1);
+
+        // EAST (+X) — face 5 (player's right side)
+        u0 = uv[5][0]; v0 = uv[5][1]; u1 = uv[5][2]; v1 = uv[5][3];
+        tessellator.texture(u1, v1); tessellator.vertex(x1, y0, z0);
+        tessellator.texture(u1, v0); tessellator.vertex(x1, y1, z0);
+        tessellator.texture(u0, v0); tessellator.vertex(x1, y1, z1);
+        tessellator.texture(u0, v1); tessellator.vertex(x1, y0, z1);
+    }
+
+    private void renderSkinBoxScaled(float x0, float y0, float z0, float x1, float y1, float z1, float[][] uv, float grow) {
+        renderSkinBox(x0 - grow, y0 - grow, z0 - grow, x1 + grow, y1 + grow, z1 + grow, uv);
+    }
+
 
     public void renderNameTags(PlayerManager playerManager, Player localPlayer, FontRenderer fontRenderer) {
         glEnable(GL_DEPTH_TEST); glEnable(GL_BLEND);

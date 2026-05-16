@@ -55,7 +55,18 @@ public class Broadcaster {
         }
     }
 
-    public static void broadcastPos(Client sender, double x, double y, double z, float yaw, int ping) {
+    public static void broadcastSkin(String username, byte[] png) {
+        for (Client client : Server.clients) {
+            client.send(o -> {
+                o.writeByte(Packets.SKIN_DATA);
+                o.writeUTF(username);
+                o.writeInt(png.length);
+                o.write(png);
+            });
+        }
+    }
+
+    public static void broadcastPos(Client sender, double x, double y, double z, float yaw, float pitch, int ping) {
         for (Client client : Server.clients) {
             if (client == sender) continue;
 
@@ -78,6 +89,7 @@ public class Broadcaster {
                 o.writeDouble(sy);
                 o.writeDouble(sz);
                 o.writeFloat(yaw);
+                o.writeFloat(pitch);
                 o.writeInt(ping);
             });
         }
