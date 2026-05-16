@@ -12,8 +12,13 @@ public class Client {
 
     private double[] lastPos = null;
     private long lastMoveTime = 0;
+    private double moveTokens = 10.0;
+
     private double placeTokens = 0.0;
     private long lastPlaceTime = 0;
+
+    private double breakTokens = 0.0;
+    private long lastBreakTime = 0;
 
     public Client(String username, Socket socket, DataOutputStream out) {
         this.username = username;
@@ -36,6 +41,7 @@ public class Client {
 
     public double[] getLastPos() { return lastPos; }
     public long getLastMoveTime() { return lastMoveTime; }
+    public double getMoveTokens() { return moveTokens; }
 
     public void setLastPos(double x, double y, double z, long time) {
         if (lastPos == null) lastPos = new double[3];
@@ -45,11 +51,23 @@ public class Client {
         this.lastMoveTime = time;
     }
 
+    public void setMoveTokens(double tokens, long time) {
+        this.moveTokens = tokens;
+        this.lastMoveTime = time;
+    }
+
     public double getPlaceTokens() { return placeTokens; }
     public long getLastPlaceTime() { return lastPlaceTime; }
     public void setPlaceTokens(double tokens, long time) {
         this.placeTokens = tokens;
         this.lastPlaceTime = time;
+    }
+
+    public double getBreakTokens() { return breakTokens; }
+    public long getLastBreakTime() { return lastBreakTime; }
+    public void setBreakTokens(double tokens, long time) {
+        this.breakTokens = tokens;
+        this.lastBreakTime = time;
     }
 
     @FunctionalInterface
