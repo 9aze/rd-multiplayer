@@ -208,28 +208,100 @@ public class LevelRenderer implements LevelListener {
         glDisable(GL_TEXTURE_2D); glDisable(GL_CULL_FACE); glDisable(GL_FOG);
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        long now = System.currentTimeMillis();
+
         for (Map.Entry<String, client.Position> entry : playerManager.getPlayers().entrySet()) {
             client.Position pos = entry.getValue();
+            updateAnimation(pos, now);
+
             glPushMatrix();
             glTranslatef((float) pos.x, (float) pos.y - 1.62f, (float) pos.z);
             glRotatef(-pos.yaw, 0f, 1f, 0f);
-            tessellator.init();
-            renderPlayerModel();
-            tessellator.flush();
+            renderPlayerModel(pos.limbSwing, pos.limbSwingAmount);
             glPopMatrix();
         }
 
         glDisable(GL_BLEND); glEnable(GL_CULL_FACE); glEnable(GL_FOG); glEnable(GL_TEXTURE_2D);
     }
 
-    private void renderPlayerModel() {
-        renderBox(-0.25f, 1.25f, -0.25f,  0.25f, 1.75f,  0.25f,  0.85f, 0.65f, 0.50f);
-        renderBox(-0.25f, 0.50f, -0.125f, 0.25f, 1.25f,  0.125f, 0.22f, 0.40f, 0.75f);
-        renderBox( 0.00f, 0.00f, -0.125f, 0.25f, 0.50f,  0.125f, 0.15f, 0.25f, 0.55f);
-        renderBox(-0.25f, 0.00f, -0.125f, 0.00f, 0.50f,  0.125f, 0.15f, 0.25f, 0.55f);
-        renderBox( 0.25f, 0.50f, -0.125f, 0.50f, 1.25f,  0.125f, 0.85f, 0.65f, 0.50f);
-        renderBox(-0.50f, 0.50f, -0.125f,-0.25f, 1.25f,  0.125f, 0.85f, 0.65f, 0.50f);
+    /** Walk-cycle constants — tune to taste. */
+    private static final float SWING_SPEED    = 0.33f;    // phase advance per frame at full motion
+    private static final float SWING_AMP      = 0.9f;     // peak swing in radians (~52°)
+    private static final float SWING_EASE     = 0.4f;     // how fast amount eases toward target
+    private static final float MOVE_THRESHOLD = 0.05f;    // blocks moved per frame to count as "moving"
+
+    private static void updateAnimation(client.Position pos, long now) {
+        // First frame for this player — initialise and bail.
+        if (pos.lastAnimTime == 0) {
+            pos.lastAnimTime = now;
+            pos.prevAnimX = pos.x;
+            pos.prevAnimZ = pos.z;
+            return;
+        }
+
+        double dx = pos.x - pos.prevAnimX;
+        double dz = pos.z - pos.prevAnimZ;
+        double moved = Math.sqrt(dx * dx + dz * dz);
+
+        // Ease limbSwingAmount toward 1.0 if moving, 0.0 if still.
+        float target = (moved > MOVE_THRESHOLD) ? 1f : 0f;
+        pos.limbSwingAmount += (target - pos.limbSwingAmount) * SWING_EASE;
+
+        // Advance the swing phase proportional to how strongly limbs are swinging.
+        pos.limbSwing += SWING_SPEED * pos.limbSwingAmount;
+
+        pos.prevAnimX = pos.x;
+        pos.prevAnimZ = pos.z;
+        pos.lastAnimTime = now;
+    }
+
+    private void renderPlayerModel(float limbSwing, float limbSwingAmount) {
+        // Static parts (head + face details + body) share the player's base
+        // transform, so they all go in one batched tessellator call.
+        tessellator.init();
+        renderBox(-0.25f, 1.25f, -0.25f,  0.25f, 1.75f,  0.25f,  0.85f, 0.65f, 0.50f); // head
+        renderBox(-0.25f, 0.50f, -0.125f, 0.25f, 1.25f,  0.125f, 0.22f, 0.40f, 0.75f); // body
         renderPlayerFace();
+        tessellator.flush();
+
+        float swing = (float) Math.sin(limbSwing) * SWING_AMP * limbSwingAmount;
+        float swingDeg = (float) Math.toDegrees(swing);
+
+        // Right leg — pivots at hip (top of leg, y = 0.50).
+        renderLimb( 0.00f, 0.00f, -0.125f, 0.25f, 0.50f, 0.125f,
+                    0.15f, 0.25f, 0.55f,  0.50f,  swingDeg);
+
+        // Left leg — opposite phase.
+        renderLimb(-0.25f, 0.00f, -0.125f, 0.00f, 0.50f, 0.125f,
+                    0.15f, 0.25f, 0.55f,  0.50f, -swingDeg);
+
+        // Right arm — pivots at shoulder (top of arm, y = 1.25).
+        renderLimb( 0.25f, 0.50f, -0.125f, 0.50f, 1.25f, 0.125f,
+                    0.85f, 0.65f, 0.50f,  1.25f, -swingDeg);
+
+        // Left arm — same phase as right leg.
+        renderLimb(-0.50f, 0.50f, -0.125f,-0.25f, 1.25f, 0.125f,
+                    0.85f, 0.65f, 0.50f,  1.25f,  swingDeg);
+    }
+
+    /**
+     * Render a box rotated around the X axis at {@code pivotY}.
+     * Each limb is its own tessellator batch because the matrix differs per limb.
+     */
+    private void renderLimb(float x0, float y0, float z0,
+                            float x1, float y1, float z1,
+                            float r,  float g,  float b,
+                            float pivotY, float angleDeg) {
+        glPushMatrix();
+        glTranslatef(0f, pivotY, 0f);
+        glRotatef(angleDeg, 1f, 0f, 0f);
+        glTranslatef(0f, -pivotY, 0f);
+
+        tessellator.init();
+        renderBox(x0, y0, z0, x1, y1, z1, r, g, b);
+        tessellator.flush();
+
+        glPopMatrix();
     }
 
     private void renderPlayerFace() {
