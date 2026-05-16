@@ -11,19 +11,18 @@ public class ClientHandler {
 
     private static final int MAX_USERNAME_LENGTH = 15;
     private static final int MIN_USERNAME_LENGTH = 3;
-    private static final int MAX_MESSAGE_LENGTH = 256;
+    private static final int MAX_MESSAGE_LENGTH  = 256;
 
     public static void handle(Socket socket) {
-        DataInputStream  in = null;
+        DataInputStream in = null;
         DataOutputStream out = null;
         Client client = null;
 
-         ChunkTracker chunkTracker = new ChunkTracker();
+        ChunkTracker chunkTracker = new ChunkTracker();
 
         try {
-            in = new DataInputStream(socket.getInputStream());
+            in  = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 8192));
-
             byte packetId = in.readByte();
             if (packetId != Packets.AUTH_REQUEST) {
                 reject(out, socket);
@@ -54,7 +53,7 @@ public class ClientHandler {
 
             if (taken || Server.clients.size() >= Server.PLAYER_LIMIT) {
                 if (taken) System.out.println("Rejected " + username + ": Username taken.");
-                else System.out.println("Rejected " + username + ": Player limit reached.");
+                else       System.out.println("Rejected " + username + ": Player limit reached.");
                 reject(out, socket);
                 return;
             }
@@ -74,11 +73,10 @@ public class ClientHandler {
                 packetId = in.readByte();
 
                 switch (packetId) {
-
                     case Packets.REQUEST_LEVEL: {
-                        double spawnX = Server.level.getWidth() / 2.0;
-                        double spawnY = Server.level.getDepth() + 3.0; 
-                        double spawnZ = Server.level.getHeight() / 2.0;
+                        double spawnX = 128.0;
+                        double spawnY = Server.level.getDepth() + 3.0;
+                        double spawnZ = 128.0;
 
                         final Client c = client;
 
@@ -88,11 +86,9 @@ public class ClientHandler {
                             o.writeDouble(spawnY);
                             o.writeDouble(spawnZ);
                         });
-
                         c.send(o -> chunkTracker.update(spawnX, spawnZ, o));
                         break;
                     }
-
 
                     case Packets.BLOCK_BREAK: {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
@@ -131,6 +127,7 @@ public class ClientHandler {
                             }
                             break;
                         }
+
                         final double fx = x, fz = z;
                         final Client c = client;
                         c.send(o -> chunkTracker.update(fx, fz, o));
@@ -185,6 +182,7 @@ public class ClientHandler {
             }
         }
     }
+
     private static void reject(DataOutputStream out, Socket socket) throws IOException {
         out.writeByte(Packets.AUTH_FAILED);
         out.flush();

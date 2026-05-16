@@ -47,46 +47,50 @@ public class Minecraft implements Runnable {
     }
 
     public long rtt;
+
     private final Timer timer = new Timer(60);
 
     public Level level;
     public LevelRenderer levelRenderer;
     public Player player;
-
+ 
     public volatile boolean levelReady = false;
-    public int pendingWidth  = -1;
+    public int pendingWidth = -1;
     public int pendingHeight = -1;
-    public int pendingDepth  = -1;
+    public int pendingDepth = -1;
     public byte[] pendingBlocks = null;
     public volatile boolean levelUpdatePending = false;
- 
+
     private FontRenderer font;
     private Font minecraftFont;
     public Chat chat;
     public SocketClient socket;
     public Thread socketThread;
     public PlayerManager playerManager;
+
     private Crosshair crosshair;
     private Info info;
     public int fps;
+
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
+
     public final int width = 1280;
     private final int height = 720;
+
     private final IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
-
 
     public Minecraft(String ip, int port, String username) throws IOException {
         mc = this;
         this.username = username;
         this.socket = new SocketClient(ip, port, username);
-        this.socketThread = new Thread(socket);
+        this.socketThread  = new Thread(socket);
         this.playerManager = new PlayerManager();
-        this.level = new Level(256, 256, 64);
+
+        this.level = new Level(64);
     }
 
-    // initialisation
     public void init() throws LWJGLException {
         fogColor.put(new float[]{14/255f, 11/255f, 10/255f, 1f}).flip();
 
@@ -150,6 +154,8 @@ public class Minecraft implements Runnable {
         if (levelRenderer == null) {
             levelRenderer = new LevelRenderer(level);
             player = new Player(level);
+
+            level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
         }
 
         keepAlive();
@@ -181,7 +187,7 @@ public class Minecraft implements Runnable {
 
     private void applyPendingLevel() {
         if (!levelUpdatePending) return;
-        this.level = new Level(pendingWidth, pendingHeight, pendingDepth);
+        this.level = new Level(pendingDepth);
         this.level.loadLevel(pendingWidth, pendingHeight, pendingDepth, pendingBlocks);
         this.levelRenderer = new LevelRenderer(this.level);
         this.player = new Player(this.level);
@@ -198,7 +204,6 @@ public class Minecraft implements Runnable {
         if (player != null) player.tick();
     }
 
-    // camera
     private void moveCameraToPlayer(float pt) {
         glTranslatef(0f, 0f, -0.3f);
         glRotatef(player.xRotation, 1f, 0f, 0f);
@@ -243,15 +248,15 @@ public class Minecraft implements Runnable {
 
         long closest = 0L;
         int[] names  = new int[10];
-        int hitNameCount = 0;
+        int   hitNameCount = 0;
 
         int hits = glRenderMode(GL_RENDER);
         for (int hi = 0; hi < hits; hi++) {
             int  nameCount = selectBuffer.get();
-            long minZ = selectBuffer.get();
+            long minZ      = selectBuffer.get();
             selectBuffer.get();
             if (minZ < closest || hi == 0) {
-                closest = minZ;
+                closest      = minZ;
                 hitNameCount = nameCount;
                 for (int ni = 0; ni < nameCount; ni++) names[ni] = selectBuffer.get();
             } else {
@@ -259,14 +264,17 @@ public class Minecraft implements Runnable {
             }
         }
 
-        hitResult = hitNameCount > 0 ? new HitResult(names[0], names[1], names[2], names[3], names[4]) : null;
+        hitResult = hitNameCount > 0
+                ? new HitResult(names[0], names[1], names[2], names[3], names[4])
+                : null;
     }
 
-    // 
     private void render(float pt) throws IOException {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        boolean worldReady = (levelReady || !levelUpdatePending) && level != null && levelRenderer != null && player != null && level.hasAnyChunk();
+        boolean worldReady = (levelReady || !levelUpdatePending)
+                && level != null && levelRenderer != null && player != null
+                && level.hasAnyChunk();
 
         if (worldReady) {
             float motionX = Mouse.getDX();
@@ -292,7 +300,10 @@ public class Minecraft implements Runnable {
                         float pMinX = (float)(player.x - player.width),  pMaxX = (float)(player.x + player.width);
                         float pMinY = (float)(player.y - player.height),  pMaxY = (float)(player.y + player.height);
                         float pMinZ = (float)(player.z - player.width),  pMaxZ = (float)(player.z + player.width);
-                        boolean intersects = pMaxX > x && pMinX < x+1 && pMaxY > y && pMinY < y+1 && pMaxZ > z && pMinZ < z+1; //aabb
+                        boolean intersects =
+                                pMaxX > x && pMinX < x+1 &&
+                                pMaxY > y && pMinY < y+1 &&
+                                pMaxZ > z && pMinZ < z+1;
                         if (!intersects) SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z);
                     }
                 }
@@ -328,8 +339,6 @@ public class Minecraft implements Runnable {
 
         Display.update();
     }
-
-    // keep-alive
     private void keepAlive() {
         Thread t = new Thread(() -> {
             while (true) {
@@ -346,8 +355,6 @@ public class Minecraft implements Runnable {
         t.setDaemon(true);
         t.start();
     }
-
-    // loading screen 
     private int loadingBackground = -1;
 
     private void renderLoadingScreen() {
@@ -369,10 +376,10 @@ public class Minecraft implements Runnable {
         glColor4f(1f, 1f, 1f, 1f);
         Textures.bind(loadingBackground);
         glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex2f(0, 0);
+        glTexCoord2f(0,0); glVertex2f(0,     0);
         glTexCoord2f(1,0); glVertex2f(width, 0);
         glTexCoord2f(1,1); glVertex2f(width, height);
-        glTexCoord2f(0,1); glVertex2f(0, height);
+        glTexCoord2f(0,1); glVertex2f(0,     height);
         glEnd();
 
         String text = "Loading chunks...";
@@ -388,6 +395,7 @@ public class Minecraft implements Runnable {
 
         Display.update();
     }
+
 
     public PlayerManager getPlayerManager() { return playerManager; }
     public Level getLevel() { return level; }

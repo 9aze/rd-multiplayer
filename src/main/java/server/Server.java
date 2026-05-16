@@ -19,18 +19,19 @@ public class Server {
 
     private static final Path PROPERTIES_PATH = Paths.get("server.properties");
 
-    public static int PORT = 9090;
+    public static int PORT         = 9090;
     public static int PLAYER_LIMIT = 50;
-    public static int MAX_PER_IP = 3;
+    public static int MAX_PER_IP   = 3;
 
     public static Level level;
 
-    public static final Set<Client> clients = ConcurrentHashMap.newKeySet();
+    public static final Set<Client>                   clients       = ConcurrentHashMap.newKeySet();
     public static final ConcurrentHashMap<Client,Long> lastKeepAlive = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws IOException {
         loadProperties();
-        level = new Level(256, 256, 64);
+
+        level = new Level(64);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Saving all chunks...");
@@ -44,7 +45,8 @@ public class Server {
 
         while (true) {
             Socket clientSocket = serverSocket.accept();
-            System.out.println("Client connected from: " + clientSocket.getInetAddress().getHostAddress());
+            System.out.println("Client connected from: "
+                    + clientSocket.getInetAddress().getHostAddress());
             new Thread(() -> ClientHandler.handle(clientSocket)).start();
         }
     }
@@ -56,9 +58,9 @@ public class Server {
             Properties p = new Properties();
             try (InputStream in = Files.newInputStream(PROPERTIES_PATH)) { p.load(in); }
 
-            PORT = Integer.parseInt(p.getProperty("port", "9090"));
+            PORT         = Integer.parseInt(p.getProperty("port",         "9090"));
             PLAYER_LIMIT = Integer.parseInt(p.getProperty("player_limit", "50"));
-            MAX_PER_IP = Integer.parseInt(p.getProperty("max_per_ip", "3"));
+            MAX_PER_IP   = Integer.parseInt(p.getProperty("max_per_ip",   "3"));
 
             System.out.println("Loaded server.properties");
         } catch (Exception e) {
@@ -69,9 +71,9 @@ public class Server {
 
     private static void createDefaultProperties() throws IOException {
         Properties d = new Properties();
-        d.setProperty("port", "9090");
+        d.setProperty("port",         "9090");
         d.setProperty("player_limit", "50");
-        d.setProperty("max_per_ip", "3");
+        d.setProperty("max_per_ip",   "3");
         try (OutputStream out = Files.newOutputStream(PROPERTIES_PATH)) {
             d.store(out, "Server Properties");
         }
