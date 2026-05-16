@@ -26,7 +26,6 @@ public class LevelChunk {
         this.blocks = new byte[CHUNK_SIZE * CHUNK_SIZE * depth];
     }
 
-    // block access
     private int index(int lx, int y, int lz) {
         return (y * CHUNK_SIZE + lz) * CHUNK_SIZE + lx;
     }
@@ -40,17 +39,20 @@ public class LevelChunk {
         dirty = true;
     }
 
-    public boolean isDirty() {return dirty;}
-    public void cleardirty() {dirty = false;}
-    public void markDirty() {dirty = true;}
+    public boolean isDirty() { return dirty; }
+    public void cleardirty() { dirty = false; }
+    public void markDirty()  { dirty = true; }
 
-    // chunk generation
     public void generate() {
         int surfaceY = depth * 2 / 3;
-        for (int y = 0; y < depth; y++) {
-            byte id = (y <= surfaceY) ? (byte) 1 : (byte) 0;
-            for (int lz = 0; lz < CHUNK_SIZE; lz++) {
-                for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+
+        for (int lz = 0; lz < CHUNK_SIZE; lz++) {
+            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (int y = 0; y < depth; y++) {
+                    byte id;
+                    if      (y > surfaceY)         id = 0; // air
+                    else if (y == surfaceY)         id = 1; // grass
+                    else                            id = 2; // cobble
                     blocks[index(lx, y, lz)] = id;
                 }
             }
@@ -58,12 +60,10 @@ public class LevelChunk {
         dirty = true;
     }
 
-    // persistence (syncing to disk)
     private static Path chunkPath(Path dir, int cx, int cz) {
         return dir.resolve("c_" + cx + "_" + cz + ".dat");
     }
 
-    // load from disk
     public boolean load(Path chunkDir) {
         Path p = chunkPath(chunkDir, chunkX, chunkZ);
         if (!Files.exists(p)) return false;
@@ -77,7 +77,6 @@ public class LevelChunk {
         }
     }
 
-    // save to disk
     public void save(Path chunkDir) {
         if (!dirty) return;
         Path p = chunkPath(chunkDir, chunkX, chunkZ);
@@ -96,5 +95,4 @@ public class LevelChunk {
         markDirty();
         save(chunkDir);
     }
-    
 }

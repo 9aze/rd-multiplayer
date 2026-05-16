@@ -16,6 +16,7 @@ public class ClientHandler {
     private static final int MAX_USERNAME_LENGTH = 15;
     private static final int MIN_USERNAME_LENGTH = 3;
     private static final int MAX_MESSAGE_LENGTH  = 256;
+    private static final int MAX_BLOCK_ID = 9;
 
     public static void handle(Socket socket) {
         DataInputStream in = null;
@@ -64,8 +65,7 @@ public class ClientHandler {
                 if (taken) {
                     System.out.println("Rejected " + username + ": Username taken.");
                     reject(out, socket, "Username is already taken!");
-                }
-                else  {
+                } else {
                     System.out.println("Rejected " + username + ": Player limit reached.");
                     reject(out, socket, "This server is full!");
                 }
@@ -82,11 +82,11 @@ public class ClientHandler {
             System.out.println("Client authenticated: " + username);
             Broadcaster.broadcastConnection(0, client);
 
-
             while (true) {
                 packetId = in.readByte();
 
                 switch (packetId) {
+
                     case Packets.REQUEST_LEVEL: {
                         double[] spawnPos = findSpawnPosition();
                         double spawnX = spawnPos[0];
@@ -94,7 +94,6 @@ public class ClientHandler {
                         double spawnZ = spawnPos[2];
 
                         final Client c = client;
-
                         c.send(o -> {
                             o.writeByte(Packets.SET_POS);
                             o.writeDouble(spawnX);
@@ -109,24 +108,33 @@ public class ClientHandler {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
                         if (!AntiCheat.checkBlock(client, x, y, z, false, System.currentTimeMillis())) break;
                         Server.level.setTile(x, y, z, 0);
-                        Broadcaster.broadcastBlock(Packets.BLOCK_BREAK, x, y, z);
+                        Broadcaster.broadcastBlock(Packets.BLOCK_BREAK, x, y, z, 0);
                         break;
                     }
 
                     case Packets.BLOCK_PLACE: {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
+                        int blockId = in.readByte() & 0xFF;
+
+                        if (blockId <= 0 || blockId > MAX_BLOCK_ID) {
+                            System.out.println("Rejected BLOCK_PLACE from " + client.getUsername()
+                                    + ": invalid blockId " + blockId);
+                            break;
+                        }
+
                         if (!AntiCheat.checkBlock(client, x, y, z, true, System.currentTimeMillis())) break;
-                        Server.level.setTile(x, y, z, 1);
-                        Broadcaster.broadcastBlock(Packets.BLOCK_PLACE, x, y, z);
+
+                        Server.level.setTile(x, y, z, blockId);
+                        Broadcaster.broadcastBlock(Packets.BLOCK_PLACE, x, y, z, blockId);
                         break;
                     }
 
                     case Packets.POS: {
-                        double x = in.readDouble();
-                        double y = in.readDouble();
-                        double z = in.readDouble();
-                        float yaw = in.readFloat();
-                        int ping = in.readInt();
+                        double x   = in.readDouble();
+                        double y   = in.readDouble();
+                        double z   = in.readDouble();
+                        float  yaw = in.readFloat();
+                        int    ping = in.readInt();
 
                         long now = System.currentTimeMillis();
                         if (!AntiCheat.checkMovement(client, x, y, z, now)) {
@@ -230,12 +238,11 @@ public class ClientHandler {
 
         for (int y = depth - 1; y >= 0; y--) {
             if (chunk.getBlock(lx, y, lz) != 0) {
-                return y+1;
+                return y + 1;
             }
         }
         return -1;
     }
-
 
     private static void reject(DataOutputStream out, Socket socket, String reason) throws IOException {
         out.writeByte(Packets.AUTH_FAILED);

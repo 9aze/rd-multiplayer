@@ -37,9 +37,7 @@ public class SocketClient implements Runnable {
     public void run() {
         try {
             setLoading("Connecting to server...", Color.WHITE);
-
             socket = new Socket(host, port);
-
             setLoading("Connected to server!", Color.WHITE);
 
             in  = new DataInputStream(socket.getInputStream());
@@ -54,12 +52,10 @@ public class SocketClient implements Runnable {
             setLoading("Sending authentication request...", Color.WHITE);
 
             byte response = in.readByte();
-
             setLoading("Waiting for authentication response...", Color.WHITE);
 
             if (response != Packets.AUTH_SUCCESS) {
-                if(response == Packets.AUTH_FAILED) {
-
+                if (response == Packets.AUTH_FAILED) {
                     String reason = in.readUTF();
                     setLoading("Auth failed: " + reason, Color.RED);
                 }
@@ -83,7 +79,6 @@ public class SocketClient implements Runnable {
 
                 switch (packetId) {
 
-
                     case Packets.CHUNK_DATA: {
                         int cx    = in.readInt();
                         int cz    = in.readInt();
@@ -91,55 +86,42 @@ public class SocketClient implements Runnable {
                         int len   = in.readInt();
                         byte[] data = new byte[len];
                         in.readFully(data);
-
                         Level level = Minecraft.mc.level;
                         if (level != null) {
                             level.loadChunk(cx, cz, depth, data);
-                            if (!Minecraft.mc.levelReady) {
-                                Minecraft.mc.levelReady = true;
-                            }
+                            if (!Minecraft.mc.levelReady) Minecraft.mc.levelReady = true;
                         }
                         break;
                     }
 
                     case Packets.CHUNK_UNLOAD: {
-                        int cx = in.readInt();
-                        int cz = in.readInt();
+                        int cx = in.readInt(), cz = in.readInt();
                         Level level = Minecraft.mc.level;
-                        if (level != null) {
-                            level.unloadChunk(cx, cz);
-                        }
+                        if (level != null) level.unloadChunk(cx, cz);
                         break;
                     }
 
                     case Packets.LEVEL_DATA: {
                         setLoading("Receiving level metadata...", Color.WHITE);
-
-                        int w   = in.readInt();
-                        int h   = in.readInt();
-                        int d   = in.readInt();
+                        int w = in.readInt(), h = in.readInt(), d = in.readInt();
                         int len = in.readInt();
-
                         setLoading("Downloading world (" + len + " bytes)...", Color.WHITE);
-
                         byte[] blocks = new byte[len];
                         in.readFully(blocks);
-
                         setLoading("Applying world...", Color.WHITE);
-
                         Minecraft.mc.pendingWidth  = w;
                         Minecraft.mc.pendingHeight = h;
                         Minecraft.mc.pendingDepth  = d;
                         Minecraft.mc.pendingBlocks = blocks;
                         Minecraft.mc.levelUpdatePending = true;
-
                         setLoading("Level loaded successfully!", Color.GREEN);
                         break;
                     }
 
                     case Packets.BLOCK_PLACE: {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
-                        pendingBlocks.add(new int[]{x, y, z, 1});
+                        int id = in.readByte() & 0xFF;
+                        pendingBlocks.add(new int[]{x, y, z, id});
                         break;
                     }
 
@@ -162,8 +144,8 @@ public class SocketClient implements Runnable {
                     case Packets.POS: {
                         String uname = in.readUTF();
                         double x = in.readDouble(), y = in.readDouble(), z = in.readDouble();
-                        float  yaw  = in.readFloat();
-                        int    ping = in.readInt();
+                        float yaw = in.readFloat();
+                        int ping = in.readInt();
                         Minecraft.mc.getPlayerManager().updatePlayer(uname, x, y, z, yaw, ping);
                         break;
                     }
@@ -193,10 +175,9 @@ public class SocketClient implements Runnable {
                         break;
                     }
 
-                    default: {
+                    default:
                         System.err.println("Unknown packet: " + packetId);
                         break;
-                    }
                 }
             }
 
@@ -206,12 +187,18 @@ public class SocketClient implements Runnable {
         }
     }
 
-    public static void sendBlock(int packet, int x, int y, int z) throws IOException {
+
+    public static void sendBlock(int packet, int x, int y, int z, int blockId) throws IOException {
         synchronized (writeLock) {
             out.writeByte(packet);
             out.writeInt(x); out.writeInt(y); out.writeInt(z);
+            if (packet == Packets.BLOCK_PLACE) out.writeByte(blockId);
             out.flush();
         }
+    }
+
+    public static void sendBlock(int packet, int x, int y, int z) throws IOException {
+        sendBlock(packet, x, y, z, 0);
     }
 
     public static void sendPos(int packet, double x, double y, double z, float yaw, int ping)

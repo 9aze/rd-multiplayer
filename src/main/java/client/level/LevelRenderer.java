@@ -167,15 +167,19 @@ public class LevelRenderer implements LevelListener {
                 for (int z = z0; z < z1; z++) {
                     glPushName(z);
                     if (level.isSolidTile(x, y, z)) {
-                        glPushName(0);
-                        for (int face = 0; face < 6; face++) {
-                            glPushName(face);
-                            tessellator.init();
-                            Tile.rock.renderFace(tessellator, x, y, z, face);
-                            tessellator.flush();
+                        int blockId = level.getRawBlock(x, y, z) & 0xFF;
+                        Tile tile = Tile.fromId(blockId);
+                        if (tile != null) {
+                            glPushName(0);
+                            for (int face = 0; face < 6; face++) {
+                                glPushName(face);
+                                tessellator.init();
+                                tile.renderFace(tessellator, x, y, z, face);
+                                tessellator.flush();
+                                glPopName();
+                            }
                             glPopName();
                         }
-                        glPopName();
                     }
                     glPopName();
                 }
@@ -186,12 +190,16 @@ public class LevelRenderer implements LevelListener {
     }
 
     public void renderHit(HitResult hitResult) {
+        int blockId = level.getRawBlock(hitResult.x, hitResult.y, hitResult.z) & 0xFF;
+        Tile tile = Tile.fromId(blockId);
+        if (tile == null) return;
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_CURRENT_BIT);
         glColor4f(1f, 1f, 1f,
                 (float) Math.sin(System.currentTimeMillis() / 100.0) * 0.2f + 0.4f);
         tessellator.init();
-        Tile.rock.renderFace(tessellator, hitResult.x, hitResult.y, hitResult.z, hitResult.face);
+        tile.renderFace(tessellator, hitResult.x, hitResult.y, hitResult.z, hitResult.face);
         tessellator.flush();
         glDisable(GL_BLEND);
     }

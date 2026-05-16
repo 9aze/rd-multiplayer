@@ -76,7 +76,7 @@ public class Minecraft implements Runnable {
     public PlayerManager playerManager;
 
     private Crosshair crosshair;
-    private Info info;
+    public Info info;
     public  int fps;
 
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
@@ -202,6 +202,7 @@ public class Minecraft implements Runnable {
     }
 
     private void tick() throws IOException {
+        info.tickScroll();
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
@@ -309,7 +310,7 @@ public class Minecraft implements Runnable {
                                 pMaxX > x && pMinX < x+1 &&
                                 pMaxY > y && pMinY < y+1 &&
                                 pMaxZ > z && pMinZ < z+1;
-                        if (!intersects) SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z);
+                        if (!intersects) SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z, info.getSelectedBlockId());
                     }
                 }
             }

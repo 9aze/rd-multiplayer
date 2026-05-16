@@ -9,16 +9,20 @@ import java.io.IOException;
 
 public class Broadcaster {
 
-    public static void broadcastBlock(byte type, int x, int y, int z) {
-        for (Client client : Server.clients) {
-            client.send(o -> {
-                o.writeByte(type);
-                o.writeInt(x);
-                o.writeInt(y);
-                o.writeInt(z);
-            });
-        }
+    public static void broadcastBlock(byte packet, int x, int y, int z, int blockId) {
+        for (Client c : Server.clients) {
+          c.send(o -> {
+               o.writeByte(packet);
+               o.writeInt(x); o.writeInt(y); o.writeInt(z);
+               if (packet == Packets.BLOCK_PLACE) o.writeByte(blockId);
+           });
+       }
     }
+
+    public static void broadcastBlock(byte packet, int x, int y, int z) {
+       broadcastBlock(packet, x, y, z, 0);
+    }
+
 
     public static void broadcastConnection(int type, Client sender) {
         for (Client client : Server.clients) {
