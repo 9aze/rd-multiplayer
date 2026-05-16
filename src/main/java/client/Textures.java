@@ -13,12 +13,9 @@ import static org.lwjgl.util.glu.GLU.gluBuild2DMipmaps;
 
 public class Textures {
 
-    private static int lastId = Integer.MIN_VALUE;
-
     public static int loadTexture(String resourceName, int mode) {
         int id = glGenTextures();
-
-        bind(id);
+        glBindTexture(GL_TEXTURE_2D, id);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mode);
@@ -28,7 +25,7 @@ public class Textures {
         try {
             BufferedImage bufferedImage = ImageIO.read(inputStream);
 
-            int width = bufferedImage.getWidth();
+            int width  = bufferedImage.getWidth();
             int height = bufferedImage.getHeight();
 
             int[] pixels = new int[width * height];
@@ -36,10 +33,9 @@ public class Textures {
 
             for (int i = 0; i < pixels.length; i++) {
                 int alpha = pixels[i] >> 24 & 0xFF;
-                int red = pixels[i] >> 16 & 0xFF;
-                int green = pixels[i] >> 8 & 0xFF;
-                int blue = pixels[i] & 0xFF;
-
+                int red   = pixels[i] >> 16 & 0xFF;
+                int green = pixels[i] >>  8 & 0xFF;
+                int blue  = pixels[i]       & 0xFF;
                 pixels[i] = alpha << 24 | blue << 16 | green << 8 | red;
             }
 
@@ -55,9 +51,6 @@ public class Textures {
     }
 
     public static void bind(int id) {
-        if (id != lastId) {
-            glBindTexture(GL_TEXTURE_2D, id);
-            lastId = id;
-        }
+        glBindTexture(GL_TEXTURE_2D, id);
     }
 }

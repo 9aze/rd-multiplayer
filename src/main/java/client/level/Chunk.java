@@ -83,6 +83,35 @@ public class Chunk {
         glCallList(this.lists + layer);
     }
 
+    public void rebuildNow(int layer) {
+        updates++;
+        this.dirty = false;
+
+        glNewList(this.lists + layer, GL_COMPILE);
+        glEnable(GL_TEXTURE_2D);
+        Textures.bind(TEXTURE);
+        TESSELLATOR.init();
+
+        for (int x = this.minX; x < this.maxX; ++x) {
+            for (int y = this.minY; y < this.maxY; ++y) {
+                for (int z = this.minZ; z < this.maxZ; ++z) {
+                    if (this.level.isTile(x, y, z)) {
+                        int id = (y != this.level.depth * 2 / 3) ? 1 : 0;
+                        if (id == 0) {
+                            Tile.grass.render(TESSELLATOR, this.level, layer, x, y, z);
+                        } else {
+                            Tile.rock.render(TESSELLATOR, this.level, layer, x, y, z);
+                        }
+                    }
+                }
+            }
+        }
+
+        TESSELLATOR.flush();
+        glDisable(GL_TEXTURE_2D);
+        glEndList();
+    }
+
     public void setDirty() {
         this.dirty = true;
     }

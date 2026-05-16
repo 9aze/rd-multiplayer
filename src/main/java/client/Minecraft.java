@@ -86,6 +86,8 @@ public class Minecraft implements Runnable {
         this.levelRenderer = new client.level.LevelRenderer(this.level);
         this.player = new Player(this.level);
 
+        this.levelRenderer.rebuildAll();
+
         levelUpdatePending = false;
         System.out.println("Level loaded from server!");
     }
@@ -150,29 +152,27 @@ public class Minecraft implements Runnable {
     public void run() {
         socketThread.start();
 
-        System.out.println("Waiting for server authentication and level...");
-        while (!socket.isConnected() || !levelUpdatePending) {
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException ignored) {}
-        }
-
-        keepAlive();
-
         try {
             init();
-            System.out.println("Game initialized, waiting for server level...");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, e, "Failed to start Minecraft", JOptionPane.ERROR_MESSAGE);
             System.exit(0);
         }
+
+        System.out.println("Waiting for level from server...");
+        while (!levelUpdatePending) {
+            renderLoadingScreen();
+            try { Thread.sleep(16); } catch (InterruptedException ignored) {}
+        }
+
+        applyPendingLevel();
+        keepAlive();
 
         int frames = 0;
         long lastTime = System.currentTimeMillis();
 
         try {
             while (!Display.isCloseRequested()) {
-
                 this.timer.advanceTime();
 
                 for (int i = 0; i < this.timer.ticks; ++i) {
@@ -200,7 +200,12 @@ public class Minecraft implements Runnable {
 
 
     private void tick() throws IOException {
-        applyPendingLevel();
+        int[] update;
+        while ((update = SocketClient.pendingBlocks.poll()) != null) {
+            if (this.level != null)
+                this.level.setTile(update[0], update[1], update[2], update[3]);
+        }
+
         this.player.tick();
     }
 
@@ -397,6 +402,59 @@ public class Minecraft implements Runnable {
         }, "KeepAliveThread");
         keepAliveThread.setDaemon(true);
         keepAliveThread.start();
+    }
+
+    private int loadingBackground = -1;
+
+    private void renderLoadingScreen() {
+        if (loadingBackground == -1) {
+            loadingBackground = Textures.loadTexture("/client/textures/background.png", GL_NEAREST);
+        }
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, width, height, 0, -1, 1);
+
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glColor4f(1f, 1f, 1f, 1f);
+        Textures.bind(loadingBackground);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
+        glTexCoord2f(1, 0); glVertex2f(width, 0);
+        glTexCoord2f(1, 1); glVertex2f(width, height);
+        glTexCoord2f(0, 1); glVertex2f(0, height);
+        glEnd();
+
+        String text = "Loading level...";
+        int textWidth = font.getStringWidth(text);
+        int textHeight = font.getStringHeight();
+        int tx = (width  / 2) - (textWidth  / 2);
+        int ty = (height / 2) - (textHeight / 2);
+        glColor4f(1f, 1f, 1f, 1f);
+        font.drawString(text, tx, ty, true);
+
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+
+        Display.update();
     }
 
     public PlayerManager getPlayerManager() {

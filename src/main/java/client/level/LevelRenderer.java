@@ -22,8 +22,6 @@ public class LevelRenderer implements LevelListener {
     private final int chunkAmountZ;
 
     public LevelRenderer(Level level) {
-        level.addListener(this);
-
         this.tessellator = new Tessellator();
         this.level = level;
 
@@ -40,19 +38,17 @@ public class LevelRenderer implements LevelListener {
                     int minChunkY = y * CHUNK_SIZE;
                     int minChunkZ = z * CHUNK_SIZE;
 
-                    int maxChunkX = (x + 1) * CHUNK_SIZE;
-                    int maxChunkY = (y + 1) * CHUNK_SIZE;
-                    int maxChunkZ = (z + 1) * CHUNK_SIZE;
+                    int maxChunkX = Math.min(level.width,  (x + 1) * CHUNK_SIZE);
+                    int maxChunkY = Math.min(level.depth,  (y + 1) * CHUNK_SIZE);
+                    int maxChunkZ = Math.min(level.height, (z + 1) * CHUNK_SIZE);
 
-                    maxChunkX = Math.min(level.width, maxChunkX);
-                    maxChunkY = Math.min(level.depth, maxChunkY);
-                    maxChunkZ = Math.min(level.height, maxChunkZ);
-
-                    Chunk chunk = new Chunk(level, minChunkX, minChunkY, minChunkZ, maxChunkX, maxChunkY, maxChunkZ);
-                    this.chunks[(x + y * this.chunkAmountX) * this.chunkAmountZ + z] = chunk;
+                    this.chunks[(x + y * this.chunkAmountX) * this.chunkAmountZ + z] =
+                            new Chunk(level, minChunkX, minChunkY, minChunkZ, maxChunkX, maxChunkY, maxChunkZ);
                 }
             }
         }
+
+        level.addListener(this);
     }
 
     public void render(int layer) {
@@ -232,5 +228,16 @@ public class LevelRenderer implements LevelListener {
     @Override
     public void allChanged() {
         setDirty(0, 0, 0, this.level.width, this.level.depth, this.level.height);
+    }
+
+    public void rebuildAll() {
+        int saved = Chunk.rebuiltThisFrame;
+        Chunk.rebuiltThisFrame = 0;
+        int cap = Integer.MAX_VALUE;
+
+        for (Chunk chunk : this.chunks) {
+            chunk.rebuildNow(0);
+            chunk.rebuildNow(1);
+        }
     }
 }

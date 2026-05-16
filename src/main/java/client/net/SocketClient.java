@@ -5,6 +5,7 @@ import global.Packets;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SocketClient implements Runnable {
     private final String host;
@@ -14,7 +15,9 @@ public class SocketClient implements Runnable {
     private static DataOutputStream out;
     private DataInputStream in;
 
-    public SocketClient(String host, int port, String username){
+    public static final ConcurrentLinkedQueue<int[]> pendingBlocks = new ConcurrentLinkedQueue<>();
+
+    public SocketClient(String host, int port, String username) {
         this.host = host;
         this.port = port;
         this.username = username;
@@ -24,7 +27,7 @@ public class SocketClient implements Runnable {
     public void run() {
         try {
             socket = new Socket(host, port);
-            in = new DataInputStream(socket.getInputStream());
+            in  = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(new java.io.BufferedOutputStream(socket.getOutputStream(), 8192));
 
             out.writeByte(Packets.AUTH_REQUEST);
@@ -48,41 +51,41 @@ public class SocketClient implements Runnable {
 
                 switch (packetId) {
 
-                    case Packets.BLOCK_BREAK: {
-                        int x = in.readInt();
-                        int y = in.readInt();
-                        int z = in.readInt();
-                        Minecraft.mc.getLevel().setTile(x, y, z, 0);
-                        break;
-                    }
-
                     case Packets.BLOCK_PLACE: {
                         int x = in.readInt();
                         int y = in.readInt();
                         int z = in.readInt();
-                        Minecraft.mc.getLevel().setTile(x, y, z, 1);
+                        pendingBlocks.add(new int[]{x, y, z, 1});
+                        break;
+                    }
+
+                    case Packets.BLOCK_BREAK: {
+                        int x = in.readInt();
+                        int y = in.readInt();
+                        int z = in.readInt();
+                        pendingBlocks.add(new int[]{x, y, z, 0});
                         break;
                     }
 
                     case Packets.LEVEL_DATA: {
-                        int w = in.readInt();
-                        int h = in.readInt();
-                        int d = in.readInt();
-
+                        int w   = in.readInt();
+                        int h   = in.readInt();
+                        int d   = in.readInt();
                         int len = in.readInt();
+
                         byte[] blocks = new byte[len];
                         in.readFully(blocks);
 
-                        Minecraft.mc.pendingWidth = w;
+                        Minecraft.mc.pendingWidth  = w;
                         Minecraft.mc.pendingHeight = h;
-                        Minecraft.mc.pendingDepth = d;
+                        Minecraft.mc.pendingDepth  = d;
                         Minecraft.mc.pendingBlocks = blocks;
                         Minecraft.mc.levelUpdatePending = true;
                         break;
                     }
 
                     case Packets.CHAT: {
-                        String author = in.readUTF();
+                        String author  = in.readUTF();
                         String message = in.readUTF();
                         Minecraft.mc.chat.addMessage(author, message);
                         break;
@@ -90,33 +93,31 @@ public class SocketClient implements Runnable {
 
                     case Packets.KEEPALIVE: {
                         long time = in.readLong();
-                        long now = System.currentTimeMillis();
-                        Minecraft.mc.rtt = now-time;
+                        Minecraft.mc.rtt = System.currentTimeMillis() - time;
                         break;
                     }
 
                     case Packets.CONNECTION: {
-                        int type = in.readInt();
-                        String username = in.readUTF();
-                        Minecraft.mc.chat.addConnectionMessage(username, type);
+                        int    type     = in.readInt();
+                        String uname    = in.readUTF();
+                        Minecraft.mc.chat.addConnectionMessage(uname, type);
 
-                        if(type == 1) {
-                            Minecraft.mc.getPlayerManager().removePlayer(username);
+                        if (type == 1) {
+                            Minecraft.mc.getPlayerManager().removePlayer(uname);
                         } else {
                             Minecraft.mc.player.sendPosition();
                         }
-
                         break;
                     }
 
                     case Packets.POS: {
-                        String username = in.readUTF();
-                        double x = in.readDouble();
-                        double y = in.readDouble();
-                        double z = in.readDouble();
-                        float yaw = in.readFloat();
-                        int ping = in.readInt();
-                        Minecraft.mc.getPlayerManager().updatePlayer(username, x, y, z, yaw, ping);
+                        String uname = in.readUTF();
+                        double x     = in.readDouble();
+                        double y     = in.readDouble();
+                        double z     = in.readDouble();
+                        float  yaw   = in.readFloat();
+                        int    ping  = in.readInt();
+                        Minecraft.mc.getPlayerManager().updatePlayer(uname, x, y, z, yaw, ping);
                         break;
                     }
 
