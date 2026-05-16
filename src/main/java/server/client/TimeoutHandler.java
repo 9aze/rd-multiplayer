@@ -20,7 +20,6 @@ public class TimeoutHandler {
 
                     if (now - last > TIMEOUT_MS) {
                         System.out.println("Client timed out: " + client.getUsername());
-                        Broadcaster.broadcastConnection(1, client);
                         try { client.getSocket().close(); } catch (IOException ignored) {}
                         Server.clients.remove(client);
                         Server.lastKeepAlive.remove(client);
