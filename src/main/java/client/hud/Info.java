@@ -76,7 +76,6 @@ public class Info {
 
     private void drawTablist(FontRenderer fontRenderer) {
         int lineHeight = 20;
-
         Map<String, Position> tabPlayers = new TreeMap<>(Minecraft.mc.playerManager.getPlayers());
         tabPlayers.put(Minecraft.mc.username, new Position(0, 0, 0, 0, (int) Minecraft.mc.rtt));
 
@@ -91,6 +90,7 @@ public class Info {
         int totalHeight = tabPlayers.size() * lineHeight;
         int yPadding = 2;
         int xPadding = 10;
+        int fontOffset = (lineHeight - fontRenderer.getStringHeight()) / 2;
 
         glDisable(GL_TEXTURE_2D);
         glColor4f(0f, 0f, 0f, 0.3f);
@@ -98,7 +98,7 @@ public class Info {
         glVertex2f(x - xPadding, y - yPadding);
         glVertex2f(x + widestName + xPadding, y - yPadding);
         glVertex2f(x + widestName + xPadding, y + totalHeight + yPadding);
-        glVertex2f(x - xPadding,y + totalHeight + yPadding);
+        glVertex2f(x - xPadding, y + totalHeight + yPadding);
         glEnd();
         glEnable(GL_TEXTURE_2D);
 
@@ -106,21 +106,20 @@ public class Info {
             String name = player.getKey();
             String ping = player.getValue().ping + "ms";
 
-            fontRenderer.drawString(name, x, y, Color.WHITE, true);
+            fontRenderer.drawString(name, x, y + fontOffset, Color.WHITE, true);
 
             int pingX = x + widestName - fontRenderer.getStringWidth(ping);
 
             Color pingColor;
-
-            if(player.getValue().ping >= 250) {
+            if (player.getValue().ping >= 250) {
                 pingColor = Color.RED;
-            } else if(player.getValue().ping >= 150) {
+            } else if (player.getValue().ping >= 150) {
                 pingColor = Color.ORANGE;
             } else {
                 pingColor = Color.GREEN;
             }
 
-            fontRenderer.drawString(ping, pingX, y, pingColor, true);
+            fontRenderer.drawString(ping, pingX, y + fontOffset, pingColor, true);
 
             y += lineHeight;
         }

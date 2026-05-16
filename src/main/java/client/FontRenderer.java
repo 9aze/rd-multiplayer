@@ -162,4 +162,8 @@ public class FontRenderer {
         }
         return width;
     }
+
+    public int getStringHeight() {
+        return charHeight;
+    }
 }
