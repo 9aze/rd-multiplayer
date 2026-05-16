@@ -5,6 +5,8 @@ import server.net.Broadcaster;
 import server.Server;
 import server.level.Level;
 import server.level.LevelChunk;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.io.*;
 import java.net.Socket;
@@ -32,6 +34,11 @@ public class ClientHandler {
             }
 
             String username = in.readUTF().trim();
+
+            if (isIPBanned(socket.getInetAddress().getHostAddress())) {
+                reject(out, socket, "You're IP-banned from this server!");
+                return;
+            }
 
             if (!isValidUsername(username)) {
                 reject(out, socket, "Illegal username! You can only use 16 letters, numbers and underscores!");
@@ -199,7 +206,6 @@ public class ClientHandler {
         int depth = Server.level.getDepth();
 
         for (int attempt = 0; attempt < 20; attempt++) {
-            // Uniform random point inside a circle of radius SPAWN_RADIUS
             double angle  = SPAWN_RNG.nextDouble() * 2.0 * Math.PI;
             double radius = Math.sqrt(SPAWN_RNG.nextDouble()) * SPAWN_RADIUS;
             int x = (int) Math.round(SPAWN_CENTER + radius * Math.cos(angle));
@@ -243,5 +249,12 @@ public class ClientHandler {
         int len = username.length();
         if (len < MIN_USERNAME_LENGTH || len > MAX_USERNAME_LENGTH) return false;
         return username.matches("[A-Za-z0-9_]+");
+    }
+
+    private static boolean isIPBanned(String ip) throws IOException {
+        Path path = Server.BANNED_PATH;
+        String bannedIPs = new String(Files.readAllBytes(path));
+        System.out.printf("Is %s banned: %b%n", ip, bannedIPs.contains(ip));
+        return bannedIPs.contains(ip);
     }
 }

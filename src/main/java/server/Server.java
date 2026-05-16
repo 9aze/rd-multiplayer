@@ -4,7 +4,7 @@ import server.client.Client;
 import server.client.ClientHandler;
 import server.client.TimeoutHandler;
 import server.level.Level;
-
+import java.util.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Server {
 
     private static final Path PROPERTIES_PATH = Paths.get("server.properties");
+    public static final Path BANNED_PATH = Paths.get("banned_ips.json");
 
     public static int PORT         = 9090;
     public static int PLAYER_LIMIT = 50;
@@ -54,6 +55,7 @@ public class Server {
     private static void loadProperties() {
         try {
             if (!Files.exists(PROPERTIES_PATH)) createDefaultProperties();
+            if (!Files.exists(BANNED_PATH)) createBannedJSON();
 
             Properties p = new Properties();
             try (InputStream in = Files.newInputStream(PROPERTIES_PATH)) { p.load(in); }
@@ -78,5 +80,11 @@ public class Server {
             d.store(out, "Server Properties");
         }
         System.out.println("Created default server.properties");
+    }
+
+    private static void createBannedJSON() throws IOException {
+        try (FileWriter writer = new FileWriter(BANNED_PATH.toFile())) {
+            writer.write("[]");
+        }
     }
 }
