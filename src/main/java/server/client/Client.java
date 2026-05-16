@@ -3,12 +3,18 @@ package server.client;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Client {
     private final String username;
     private final Socket socket;
     private final DataOutputStream out;
     private final Object writeLock = new Object();
+
+    // Asynchronous queue and thread per player for outbound traffic
+    private final BlockingQueue<PacketWriter> sendQueue = new LinkedBlockingQueue<>();
+    private final Thread sendThread;
 
     private double[] lastPos = null;
     private long lastMoveTime = 0;
@@ -24,14 +30,33 @@ public class Client {
         this.username = username;
         this.socket = socket;
         this.out = out;
+
+        this.sendThread = new Thread(() -> {
+            try {
+                while (!socket.isClosed()) {
+                    PacketWriter writer = sendQueue.take();
+                    synchronized (writeLock) {
+                        try {
+                            writer.write(out);
+                            out.flush();
+                        } catch (IOException ignored) {}
+                    }
+                }
+            } catch (InterruptedException e) {
+            }
+        }, "SendThread-" + username);
+        this.sendThread.setDaemon(true);
+        this.sendThread.start();
     }
 
     public void send(PacketWriter writer) {
-        synchronized (writeLock) {
-            try {
-                writer.write(out);
-                out.flush();
-            } catch (IOException ignored) {}
+        sendQueue.add(writer);
+    }
+
+    public void close() {
+        try { socket.close(); } catch (IOException ignored) {}
+        if (sendThread != null) {
+            sendThread.interrupt();
         }
     }
 

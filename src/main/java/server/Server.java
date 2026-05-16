@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Server {
+    public static final int PLAYER_LIMIT = 50;
+
     public static Level level;
     public static final Set<Client> clients = ConcurrentHashMap.newKeySet();
     public static final ConcurrentHashMap<Client, Long> lastKeepAlive = new ConcurrentHashMap<>();

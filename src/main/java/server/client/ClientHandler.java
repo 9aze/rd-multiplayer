@@ -42,6 +42,12 @@ public class ClientHandler {
                 return;
             }
 
+            if (Server.clients.size() >= Server.PLAYER_LIMIT) {
+                System.out.println("Rejected " + username + ": Player limit reached.");
+                reject(out, socket);
+                return;
+            }
+
             out.writeByte(Packets.AUTH_SUCCESS);
             out.flush();
 
@@ -151,8 +157,10 @@ public class ClientHandler {
             if (client != null) {
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
+                client.close();
+            } else {
+                try { socket.close(); } catch (IOException ignored) {}
             }
-            try { socket.close(); } catch (IOException ignored) {}
         }
     }
 
