@@ -2,6 +2,7 @@ package client.hud;
 
 import client.*;
 import client.level.Blocks;
+import client.level.FaceTextures;
 import client.level.Tile;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -13,13 +14,15 @@ import java.util.TreeMap;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Info {
-    private static final int[] BLOCKS = {1,2,3,4,5,6};
-    private static final int[] KEYS = {Keyboard.KEY_1,Keyboard.KEY_2,Keyboard.KEY_3,Keyboard.KEY_4,Keyboard.KEY_5,Keyboard.KEY_6};
+    private static final int[] BLOCKS = {1,2,3,4,5,6,7};
+    private static final int[] KEYS = {Keyboard.KEY_1,Keyboard.KEY_2,Keyboard.KEY_3,Keyboard.KEY_4,Keyboard.KEY_5,Keyboard.KEY_6,Keyboard.KEY_7};
 
     private static final int SLOT = 40, GAP = 4, PAD = 6;
 
     private final FontRenderer font;
     private int selected;
+
+    private int terrainTexture = -1;
 
     public Info(FontRenderer font) {
         this.font = font;
@@ -107,8 +110,16 @@ public class Info {
 
             float[] c = color(BLOCKS[i]);
 
-            glColor4f(c[0], c[1], c[2], 1);
-            rect(sx + 5, sy + 5, sx + SLOT - 5, sy + SLOT - 5);
+            int iconX0 = sx + 5, iconY0 = sy + 5;
+            int iconX1 = sx + SLOT - 5, iconY1 = sy + SLOT - 5;
+
+            if (BLOCKS[i] == Blocks.TNT_ID) {
+                drawBlockSideIcon(Blocks.get(Blocks.TNT_ID), iconX0, iconY0, iconX1, iconY1);
+                glDisable(GL_TEXTURE_2D);
+            } else {
+                glColor4f(c[0], c[1], c[2], 1);
+                rect(iconX0, iconY0, iconX1, iconY1);
+            }
 
             glEnable(GL_TEXTURE_2D);
 
@@ -164,6 +175,7 @@ public class Info {
             case 4: return new float[]{0.10f,0.10f,0.10f};
             case 5: return new float[]{0.90f,0.85f,0.55f};
             case 6: return new float[]{0.70f,0.35f,0.25f};
+            case 7: return new float[]{0.85f,0.20f,0.15f};
         }
 
         return new float[]{1,0,1};
@@ -183,5 +195,32 @@ public class Info {
         rect(x0, y1 - t, x1, y1);
         rect(x0, y0, x0 + t, y1);
         rect(x1 - t, y0, x1, y1);
+    }
+
+    private void drawBlockSideIcon(Tile tile, int x0, int y0, int x1, int y1) {
+        if (tile == null) return;
+
+        if (terrainTexture == -1) {
+            terrainTexture = Textures.loadTexture("/client/textures/terrain.png", GL_NEAREST);
+        }
+
+        int col = tile.faces.col(FaceTextures.NORTH);
+        float u0 = col / 16f;
+        float u1 = u0 + 16 / 256f;
+        float v0 = 0f;
+        float v1 = 16 / 256f;
+
+        glEnable(GL_TEXTURE_2D);
+        Textures.bind(terrainTexture);
+        glColor4f(1f, 1f, 1f, 1f);
+
+        glBegin(GL_QUADS);
+        glTexCoord2f(u0, v0); glVertex2f(x0, y0);
+        glTexCoord2f(u1, v0); glVertex2f(x1, y0);
+        glTexCoord2f(u1, v1); glVertex2f(x1, y1);
+        glTexCoord2f(u0, v1); glVertex2f(x0, y1);
+        glEnd();
+
+        Textures.bind(0);
     }
 }

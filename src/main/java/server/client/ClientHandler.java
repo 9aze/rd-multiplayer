@@ -5,6 +5,7 @@ import server.net.Broadcaster;
 import server.Server;
 import server.level.Level;
 import server.level.LevelChunk;
+import server.level.TntManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -126,6 +127,10 @@ public class ClientHandler {
 
                         Server.level.setTile(x, y, z, blockId);
                         Broadcaster.broadcastBlock(Packets.BLOCK_PLACE, x, y, z, blockId);
+
+                        if (blockId == TntManager.TNT_BLOCK_ID) {
+                            TntManager.schedule(x, y, z);
+                        }
                         break;
                     }
 

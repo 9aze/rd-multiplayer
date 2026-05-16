@@ -2,59 +2,90 @@ package client.level;
 
 public class Tile {
     public final int id;
-    public final int atlasCol;
     public final String name;
+    public final FaceTextures faces;
 
     private static final float MIN_V = 0f;
     private static final float MAX_V = 16 / 256f;
 
     public Tile(int id, String name) {
-        this.id = id;
-        this.atlasCol = id-1;
-        this.name = name;
+        this(id, name, FaceTextures.uniform(id - 1));
     }
 
-    public float minU() {return atlasCol / 16f;}
+    public Tile(int id, String name, FaceTextures faces) {
+        this.id = id;
+        this.name = name;
+        this.faces = faces;
+    }
 
-    public float maxU() {return minU() + 16 / 256f;}
+    private static float minU(int col) { return col / 16f; }
+    private static float maxU(int col) { return col / 16f + 16 / 256f; }
 
     public void render(Tessellator t, Level level, int layer, int x, int y, int z) {
 
-        float minU = minU(), maxU = maxU();
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
 
-        float x0 = x,     x1 = x + 1;
-        float y0 = y,     y1 = y + 1;
-        float z0 = z,     z1 = z + 1;
+        // BOTTOM (face 0)
+        {
+            float u0 = minU(faces.col(FaceTextures.BOTTOM));
+            float u1 = maxU(faces.col(FaceTextures.BOTTOM));
+            face(t, level, layer, x, y - 1, z, 1f,
+                    x0,y0,z1, x0,y0,z0, x1,y0,z0, x1,y0,z1,
+                    u0,MAX_V, u0,MIN_V, u1,MIN_V, u1,MAX_V);
+        }
 
-        face(t, level, layer, x, y - 1, z, 1f, 0,
-                x0,y0,z1, x0,y0,z0, x1,y0,z0, x1,y0,z1,
-                minU,MAX_V, minU,MIN_V, maxU,MIN_V, maxU,MAX_V);
+        // TOP (face 1)
+        {
+            float u0 = minU(faces.col(FaceTextures.TOP));
+            float u1 = maxU(faces.col(FaceTextures.TOP));
+            face(t, level, layer, x, y + 1, z, 1f,
+                    x1,y1,z1, x1,y1,z0, x0,y1,z0, x0,y1,z1,
+                    u1,MAX_V, u1,MIN_V, u0,MIN_V, u0,MAX_V);
+        }
 
-        face(t, level, layer, x, y + 1, z, 1f, 1,
-                x1,y1,z1, x1,y1,z0, x0,y1,z0, x0,y1,z1,
-                maxU,MAX_V, maxU,MIN_V, minU,MIN_V, minU,MAX_V);
+        // NORTH (face 2, -Z)
+        {
+            float u0 = minU(faces.col(FaceTextures.NORTH));
+            float u1 = maxU(faces.col(FaceTextures.NORTH));
+            face(t, level, layer, x, y, z - 1, .8f,
+                    x0,y1,z0, x1,y1,z0, x1,y0,z0, x0,y0,z0,
+                    u1,MIN_V, u0,MIN_V, u0,MAX_V, u1,MAX_V);
+        }
 
-        face(t, level, layer, x, y, z - 1, .8f, 2,
-                x0,y1,z0, x1,y1,z0, x1,y0,z0, x0,y0,z0,
-                maxU,MIN_V, minU,MIN_V, minU,MAX_V, maxU,MAX_V);
+        // SOUTH (face 3, +Z)
+        {
+            float u0 = minU(faces.col(FaceTextures.SOUTH));
+            float u1 = maxU(faces.col(FaceTextures.SOUTH));
+            face(t, level, layer, x, y, z + 1, .8f,
+                    x0,y1,z1, x0,y0,z1, x1,y0,z1, x1,y1,z1,
+                    u0,MIN_V, u0,MAX_V, u1,MAX_V, u1,MIN_V);
+        }
 
-        face(t, level, layer, x, y, z + 1, .8f, 3,
-                x0,y1,z1, x0,y0,z1, x1,y0,z1, x1,y1,z1,
-                minU,MIN_V, minU,MAX_V, maxU,MAX_V, maxU,MIN_V);
+        // WEST (face 4, -X)
+        {
+            float u0 = minU(faces.col(FaceTextures.WEST));
+            float u1 = maxU(faces.col(FaceTextures.WEST));
+            face(t, level, layer, x - 1, y, z, .6f,
+                    x0,y1,z1, x0,y1,z0, x0,y0,z0, x0,y0,z1,
+                    u1,MIN_V, u0,MIN_V, u0,MAX_V, u1,MAX_V);
+        }
 
-        face(t, level, layer, x - 1, y, z, .6f, 4,
-                x0,y1,z1, x0,y1,z0, x0,y0,z0, x0,y0,z1,
-                maxU,MIN_V, minU,MIN_V, minU,MAX_V, maxU,MAX_V);
-
-        face(t, level, layer, x + 1, y, z, .6f, 5,
-                x1,y0,z1, x1,y0,z0, x1,y1,z0, x1,y1,z1,
-                minU,MAX_V, maxU,MAX_V, maxU,MIN_V, minU,MIN_V);
+        // EAST (face 5, +X)
+        {
+            float u0 = minU(faces.col(FaceTextures.EAST));
+            float u1 = maxU(faces.col(FaceTextures.EAST));
+            face(t, level, layer, x + 1, y, z, .6f,
+                    x1,y0,z1, x1,y0,z0, x1,y1,z0, x1,y1,z1,
+                    u0,MAX_V, u1,MAX_V, u1,MIN_V, u0,MIN_V);
+        }
     }
 
     private void face(
             Tessellator t, Level level, int layer,
             int x, int y, int z,
-            float shade, int face,
+            float shade,
 
             float x0,float y0,float z0,
             float x1,float y1,float z1,
@@ -83,9 +114,9 @@ public class Tile {
 
     public void renderFace(Tessellator t, int x, int y, int z, int face) {
 
-        float x0 = x,     x1 = x + 1;
-        float y0 = y,     y1 = y + 1;
-        float z0 = z,     z1 = z + 1;
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
 
         switch (face) {
             case 0: t.vertex(x0,y0,z1); t.vertex(x0,y0,z0); t.vertex(x1,y0,z0); t.vertex(x1,y0,z1); break;
