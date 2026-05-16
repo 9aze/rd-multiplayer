@@ -81,8 +81,9 @@ public class Minecraft implements Runnable {
 
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
 
-    public final int width  = 1280;
-    private final int height = 720;
+    public int width  = 1280;
+    public int height = 720;
+    private boolean fullscreen = false;
 
     private final IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
@@ -101,9 +102,11 @@ public class Minecraft implements Runnable {
         fogColor.put(new float[]{14/255f, 11/255f, 10/255f, 1f}).flip();
 
         Display.setDisplayMode(new DisplayMode(width, height));
+        Display.setResizable(true);
         Display.setTitle("rd-multiplayer " + GIT_HASH);
         Display.setVSyncEnabled(true);
         Display.create();
+        glViewport(0, 0, width, height);
         Keyboard.create();
         Mouse.create();
 
@@ -170,6 +173,18 @@ public class Minecraft implements Runnable {
 
         try {
             while (!Display.isCloseRequested()) {
+
+                if (Display.wasResized()) {
+                    width = Display.getWidth();
+                    height = Display.getHeight();
+
+                    if (height <= 0) {
+                        height = 1;
+                    }
+
+                    glViewport(0, 0, width, height);
+                }
+
                 timer.advanceTime();
                 for (int i = 0; i < timer.ticks; i++) tick();
                 render(timer.partialTicks);
@@ -204,11 +219,40 @@ public class Minecraft implements Runnable {
     private void tick() throws IOException {
         info.tickKeys();
         info.tickScroll();
+
+
+        if(Keyboard.isKeyDown(Keyboard.KEY_F11)) {
+            toggleFullscreen();
+        }
+
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
         }
         if (player != null) player.tick();
+    }
+
+    private void toggleFullscreen() {
+        try {
+            fullscreen = !fullscreen;
+
+            if (fullscreen) {
+                Display.setDisplayModeAndFullscreen(
+                        Display.getDesktopDisplayMode()
+                );
+            } else {
+                Display.setFullscreen(false);
+                Display.setDisplayMode(new DisplayMode(1280, 720));
+            }
+
+            width = Display.getWidth();
+            height = Display.getHeight();
+
+            glViewport(0, 0, width, height);
+
+        } catch (LWJGLException e) {
+            e.printStackTrace();
+        }
     }
 
     private void moveCameraToPlayer(float pt) {
