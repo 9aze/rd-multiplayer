@@ -9,7 +9,6 @@ public class Crosshair {
 
     public Crosshair(int size, String texturePath) {
         this.size = size;
-
         this.texture = Textures.loadTexture(texturePath, GL_NEAREST);
     }
 
@@ -42,7 +41,7 @@ public class Crosshair {
         glTexCoord2f(0, 1); glVertex2f(x, y + size);
         glEnd();
 
-        Textures.bind(0); //reset the bind shi otherwise it breaks
+        Textures.bind(0);
 
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);

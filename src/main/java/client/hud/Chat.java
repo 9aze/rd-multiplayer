@@ -15,7 +15,6 @@ import java.util.List;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Chat {
-
     private static final int INPUT_HEIGHT = 20;
     private static final int LINE_HEIGHT = 21;
 
