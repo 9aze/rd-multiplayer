@@ -11,16 +11,6 @@ public class Tile {
         this.textureId = textureId;
     }
 
-    /**
-     * Render a tile at the given position
-     *
-     * @param tessellator Tessellator for rendering
-     * @param level       Level to check for surrounding tiles
-     * @param layer       The layer which decides if it's a shadow or not
-     * @param x           Tile position x
-     * @param y           Tile position y
-     * @param z           Tile position z
-     */
     public void render(Tessellator tessellator, Level level, int layer, int x, int y, int z) {
         float minU = this.textureId / 16.0F;
         float maxU = minU + 16 / 256F;
@@ -38,12 +28,9 @@ public class Tile {
         float minZ = z + 0.0F;
         float maxZ = z + 1.0F;
 
-        // Render bottom face
         if (!level.isSolidTile(x, y - 1, z)) {
-            // Get the brightness of the tile below
             float brightness = level.getBrightness(x, y - 1, z) * shadeY;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeY) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(minU, maxV);
@@ -57,12 +44,9 @@ public class Tile {
             }
         }
 
-        // Render top face
         if (!level.isSolidTile(x, y + 1, z)) {
-            // Get the brightness of the tile above
             float brightness = level.getBrightness(x, y + 1, z) * shadeY;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeY) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(maxU, maxV);
@@ -76,12 +60,9 @@ public class Tile {
             }
         }
 
-        // Render side faces Z
         if (!level.isSolidTile(x, y, z - 1)) {
-            // Get the brightness of the tile next to it
             float brightness = level.getBrightness(x, y, z - 1) * shadeZ;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeZ) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(maxU, minV);
@@ -95,10 +76,8 @@ public class Tile {
             }
         }
         if (!level.isSolidTile(x, y, z + 1)) {
-            // Get the brightness of the tile next to it
             float brightness = level.getBrightness(x, y, z + 1) * shadeZ;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeZ) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(minU, minV);
@@ -112,12 +91,9 @@ public class Tile {
             }
         }
 
-        // Render side faces X
         if (!level.isSolidTile(x - 1, y, z)) {
-            // Get the brightness of the tile next to it
             float brightness = level.getBrightness(x - 1, y, z) * shadeX;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeX) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(maxU, minV);
@@ -131,10 +107,8 @@ public class Tile {
             }
         }
         if (!level.isSolidTile(x + 1, y, z)) {
-            // Get the brightness of the tile next to it
             float brightness = level.getBrightness(x + 1, y, z) * shadeX;
 
-            // Don't render face if both conditions are the same (isShadowLayer != isFullBrightness)
             if (layer == 1 ^ brightness == shadeX) {
                 tessellator.color(brightness, brightness, brightness);
                 tessellator.texture(minU, maxV);
@@ -149,15 +123,6 @@ public class Tile {
         }
     }
 
-    /**
-     * Render the single face of a tile
-     *
-     * @param tessellator Tessellator for rendering
-     * @param x Tile position x
-     * @param y Tile position y
-     * @param z Tile position z
-     * @param face Face id (0:Top, 1:Bottom, ...)
-     */
     public void renderFace(Tessellator tessellator, int x, int y, int z, int face) {
         float minX = x + 0.0f;
         float maxX = x + 1.0f;
@@ -166,7 +131,6 @@ public class Tile {
         float minZ = z + 0.0f;
         float maxZ = z + 1.0f;
 
-        // Render face
         if (face == 0) {
             tessellator.vertex(minX, minY, maxZ);
             tessellator.vertex(minX, minY, minZ);
