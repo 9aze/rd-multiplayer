@@ -1,32 +1,27 @@
 package server.client;
 
+import server.Server;
+
 public class AntiCheat {
 
-    private static final double MAX_REACH = 10.0;
-    private static final double EYE_HEIGHT = 1.6;
-
-    private static final double PLACE_RATE = 10.0 / 1_000.0;
+    private static final double EYE_HEIGHT  = 1.6;
     private static final double PLACE_BURST = 5.0;
-
-    private static final double BREAK_RATE = 10.0 / 1_000.0;
     private static final double BREAK_BURST = 5.0;
-
-    private static final double MOVE_RATE = 20.0 / 1_000.0;
-    private static final double MOVE_BURST = 10.0;
 
     private AntiCheat() {}
 
     public static boolean checkBlock(Client client,
                                      int blockX, int blockY, int blockZ,
                                      boolean isPlace, long now) {
+        if (!Server.ANTICHEAT) return true;
+
         double[] pos = client.getLastPos();
         if (pos != null) {
             double dx = (blockX + 0.5) - pos[0];
             double dy = (blockY + 0.5) - (pos[1] + EYE_HEIGHT);
             double dz = (blockZ + 0.5) - pos[2];
             double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-
-            if (dist > MAX_REACH) {
+            if (dist > Server.MAX_REACH) {
                 System.out.printf("%s reach violation: %.1f units%n", client.getUsername(), dist);
                 return false;
             }
@@ -48,19 +43,21 @@ public class AntiCheat {
     }
 
     public static boolean checkMovement(Client client, double x, double y, double z, long now) {
+        if (!Server.ANTICHEAT) return true;
+
         double[] pos = client.getLastPos();
         long lastTime = client.getLastMoveTime();
         double tokens = client.getMoveTokens();
 
         if (pos == null || lastTime == 0) {
             client.setLastPos(x, y, z, now);
-            client.setMoveTokens(MOVE_BURST, now);
+            client.setMoveTokens(Server.MOVE_BURST, now);
             return true;
         }
 
         long elapsed = now - lastTime;
         if (elapsed > 0) {
-            tokens = Math.min(MOVE_BURST, tokens + (elapsed * MOVE_RATE));
+            tokens = Math.min(Server.MOVE_BURST, tokens + (elapsed * (Server.MOVE_RATE / 1_000.0)));
         }
 
         double dx = x - pos[0];
@@ -85,7 +82,7 @@ public class AntiCheat {
 
         if (lastRefill > 0) {
             long elapsed = now - lastRefill;
-            tokens = Math.min(PLACE_BURST, tokens + elapsed * PLACE_RATE);
+            tokens = Math.min(PLACE_BURST, tokens + elapsed * (Server.PLACE_RATE / 1_000.0));
         } else {
             tokens = PLACE_BURST;
         }
@@ -105,7 +102,7 @@ public class AntiCheat {
 
         if (lastRefill > 0) {
             long elapsed = now - lastRefill;
-            tokens = Math.min(BREAK_BURST, tokens + elapsed * BREAK_RATE);
+            tokens = Math.min(BREAK_BURST, tokens + elapsed * (Server.BREAK_RATE / 1_000.0));
         } else {
             tokens = BREAK_BURST;
         }

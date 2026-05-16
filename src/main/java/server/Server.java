@@ -4,6 +4,7 @@ import server.client.Client;
 import server.client.ClientHandler;
 import server.client.TimeoutHandler;
 import server.level.Level;
+
 import java.util.*;
 import java.io.*;
 import java.net.ServerSocket;
@@ -20,30 +21,33 @@ public class Server {
     private static final Path PROPERTIES_PATH = Paths.get("server.properties");
     public static final Path BANNED_PATH = Paths.get("banned_ips.json");
 
-    public static int PORT         = 9090;
+    public static int PORT = 9090;
     public static int PLAYER_LIMIT = 50;
-    public static int MAX_PER_IP   = 3;
+    public static int MAX_PER_IP = 3;
+    public static int CHAT_DELAY = 200;
+    public static boolean ANTICHEAT = true;
+    public static int RENDER_DISTANCE = 8;
+
+    public static double MAX_REACH  = 10.0;
+    public static double PLACE_RATE = 10.0;
+    public static double BREAK_RATE = 10.0;
+    public static double MOVE_RATE  = 20.0;
+    public static double MOVE_BURST = 10.0;
 
     public static Level level;
-
-    public static final Set<Client>                   clients       = ConcurrentHashMap.newKeySet();
-    public static final ConcurrentHashMap<Client,Long> lastKeepAlive = new ConcurrentHashMap<>();
+    public static final Set<Client> clients = ConcurrentHashMap.newKeySet();
+    public static final ConcurrentHashMap<Client, Long> lastKeepAlive = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws IOException {
         loadProperties();
-
         level = new Level(64);
-
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Saving all chunks...");
             level.save();
         }));
-
         ServerSocket serverSocket = new ServerSocket(PORT);
         System.out.println("Server started on port " + PORT);
-
         TimeoutHandler.start();
-
         while (true) {
             Socket clientSocket = serverSocket.accept();
             System.out.println("Client connected from: "
@@ -56,14 +60,19 @@ public class Server {
         try {
             if (!Files.exists(PROPERTIES_PATH)) createDefaultProperties();
             if (!Files.exists(BANNED_PATH)) createBannedJSON();
-
             Properties p = new Properties();
             try (InputStream in = Files.newInputStream(PROPERTIES_PATH)) { p.load(in); }
-
-            PORT         = Integer.parseInt(p.getProperty("port",         "9090"));
-            PLAYER_LIMIT = Integer.parseInt(p.getProperty("player_limit", "50"));
-            MAX_PER_IP   = Integer.parseInt(p.getProperty("max_per_ip",   "3"));
-
+            PORT            = Integer.parseInt(p.getProperty("port",            "9090"));
+            PLAYER_LIMIT    = Integer.parseInt(p.getProperty("player_limit",    "50"));
+            MAX_PER_IP      = Integer.parseInt(p.getProperty("max_per_ip",      "3"));
+            CHAT_DELAY      = Integer.parseInt(p.getProperty("chat_delay",      "200"));
+            ANTICHEAT       = Boolean.parseBoolean(p.getProperty("anticheat",   "true"));
+            RENDER_DISTANCE = Integer.parseInt(p.getProperty("render_distance", "8"));
+            MAX_REACH       = Double.parseDouble(p.getProperty("max_reach",     "10"));
+            PLACE_RATE      = Double.parseDouble(p.getProperty("place_rate",    "10"));
+            BREAK_RATE      = Double.parseDouble(p.getProperty("break_rate",    "10"));
+            MOVE_RATE       = Double.parseDouble(p.getProperty("move_rate",     "20"));
+            MOVE_BURST      = Double.parseDouble(p.getProperty("move_burst",    "10"));
             System.out.println("Loaded server.properties");
         } catch (Exception e) {
             System.err.println("Failed to load server.properties");
@@ -73,9 +82,17 @@ public class Server {
 
     private static void createDefaultProperties() throws IOException {
         Properties d = new Properties();
-        d.setProperty("port",         "9090");
-        d.setProperty("player_limit", "50");
-        d.setProperty("max_per_ip",   "3");
+        d.setProperty("port",            "9090");
+        d.setProperty("player_limit",    "50");
+        d.setProperty("max_per_ip",      "3");
+        d.setProperty("anticheat",       "true");
+        d.setProperty("render_distance", "8");
+        d.setProperty("chat_delay",      "200");
+        d.setProperty("max_reach",       "10");
+        d.setProperty("place_rate",      "10");
+        d.setProperty("break_rate",      "10");
+        d.setProperty("move_rate",       "20");
+        d.setProperty("move_burst",      "10");
         try (OutputStream out = Files.newOutputStream(PROPERTIES_PATH)) {
             d.store(out, "Server Properties");
         }

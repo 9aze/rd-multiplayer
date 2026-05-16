@@ -18,7 +18,6 @@ public class ClientHandler {
     private static final int MIN_USERNAME_LENGTH = 3;
     private static final int MAX_MESSAGE_LENGTH  = 256;
     private static final int MAX_BLOCK_ID = 9;
-    private static final int CHAT_DELAY = 200; //ms
 
     static long lastChatTime = 0L;
 
@@ -192,7 +191,7 @@ public class ClientHandler {
 
                     case Packets.CHAT: {
                         long now = System.currentTimeMillis();
-                        if (now - lastChatTime < CHAT_DELAY) break;
+                        if (now - lastChatTime < Server.CHAT_DELAY) break;
                         lastChatTime = now;
 
                         in.readUTF();

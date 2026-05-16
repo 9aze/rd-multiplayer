@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ChunkTracker {
 
-    public static final int RENDER_DISTANCE = 8;
+    public static final int RENDER_DISTANCE = Server.RENDER_DISTANCE;
     private static final int CHUNK_SIZE = LevelChunk.CHUNK_SIZE;
 
 
