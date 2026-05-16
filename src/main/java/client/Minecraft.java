@@ -273,7 +273,8 @@ public class Minecraft implements Runnable {
             glTranslatef(0f, 0f, -CAMERA_DISTANCE);
         }
 
-        glRotatef(player.xRotation, 1f, 0f, 0f);
+        float pitch = (cameraMode == CAMERA_SECOND) ? -player.xRotation : player.xRotation;
+        glRotatef(pitch, 1f, 0f, 0f);
         glRotatef(player.yRotation, 0f, 1f, 0f);
 
         if (cameraMode == CAMERA_SECOND) {
@@ -307,6 +308,9 @@ public class Minecraft implements Runnable {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
+        // Always pick from the player's actual eye, never from the offset 3rd/2nd
+        // person camera — otherwise you'd target blocks based on where the camera
+        // is, not where the player would reach.
         int saved = cameraMode;
         cameraMode = CAMERA_FIRST;
         moveCameraToPlayer(pt);
