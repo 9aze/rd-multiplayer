@@ -25,14 +25,14 @@ public class ClientHandler {
             out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 8192));
             byte packetId = in.readByte();
             if (packetId != Packets.AUTH_REQUEST) {
-                reject(out, socket);
+                reject(out, socket, "Invalid authentication flow!");
                 return;
             }
 
             String username = in.readUTF().trim();
 
             if (!isValidUsername(username)) {
-                reject(out, socket);
+                reject(out, socket, "Illegal username! You can only use 16 letters, numbers and underscores!");
                 return;
             }
 
@@ -47,14 +47,19 @@ public class ClientHandler {
 
             if (connectionsFromIp >= Server.MAX_PER_IP) {
                 System.out.println("Rejected " + username + ": Too many connections from IP " + ip);
-                reject(out, socket);
+                reject(out, socket, "Too many connections from your IP!");
                 return;
             }
 
             if (taken || Server.clients.size() >= Server.PLAYER_LIMIT) {
-                if (taken) System.out.println("Rejected " + username + ": Username taken.");
-                else       System.out.println("Rejected " + username + ": Player limit reached.");
-                reject(out, socket);
+                if (taken) {
+                    System.out.println("Rejected " + username + ": Username taken.");
+                    reject(out, socket, "Username is already taken!");
+                }
+                else  {
+                    System.out.println("Rejected " + username + ": Player limit reached.");
+                    reject(out, socket, "This server is full!");
+                }
                 return;
             }
 
@@ -183,8 +188,9 @@ public class ClientHandler {
         }
     }
 
-    private static void reject(DataOutputStream out, Socket socket) throws IOException {
+    private static void reject(DataOutputStream out, Socket socket, String reason) throws IOException {
         out.writeByte(Packets.AUTH_FAILED);
+        out.writeUTF(reason);
         out.flush();
         socket.close();
     }

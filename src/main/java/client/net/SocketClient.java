@@ -58,8 +58,12 @@ public class SocketClient implements Runnable {
             setLoading("Waiting for authentication response...", Color.WHITE);
 
             if (response != Packets.AUTH_SUCCESS) {
+                if(response == Packets.AUTH_FAILED) {
+
+                    String reason = in.readUTF();
+                    setLoading("Auth failed: " + reason, Color.RED);
+                }
                 System.err.println("Authentication failed!");
-                setLoading("Authentication failed!", Color.RED);
                 socket.close();
                 return;
             }
