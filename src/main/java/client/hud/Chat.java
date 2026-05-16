@@ -15,38 +15,269 @@ import java.util.List;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Chat {
-    public List<ChatMessage> messages;
-    private int messageLimit;
-    private String chatInput = "";
-    private FontRenderer fontRenderer;
-    private int w, h, x, y;
-    public boolean toggled = false;
 
-    private boolean isSelected = false;
+    private static final int INPUT_HEIGHT = 20;
+    private static final int LINE_HEIGHT = 21;
 
-    private long backspacePressedTime = 0;
-    private long lastBackspaceTime = 0;
-    private static final long INITIAL_BACKSPACE_DELAY = 400;
-    private static final long REPEAT_BACKSPACE_DELAY = 50;
+    private static final long MESSAGE_LIFETIME = 5000L;
 
-    public Chat(FontRenderer fontRenderer, int messageLimit, int x, int y, int w, int h) {
-        this.fontRenderer = fontRenderer;
-        this.messageLimit = messageLimit;
-        this.w = w;
-        this.h = h;
+    private static final long BACKSPACE_DELAY = 400L;
+    private static final long BACKSPACE_REPEAT = 50L;
+
+    private final FontRenderer font;
+    private final List<ChatMessage> messages = new ArrayList<>();
+
+    private final int maxMessages;
+
+    private final int x, y, width, height;
+
+    private String input = "";
+
+    public boolean toggled;
+
+    private boolean selected;
+
+    private long backspaceStart;
+    private long lastBackspace;
+
+    public Chat(FontRenderer font, int maxMessages, int x, int y, int width, int height) {
+        this.font = font;
+        this.maxMessages = maxMessages;
+
         this.x = x;
         this.y = y;
-        this.toggled = false;
-        this.messages = new ArrayList<>();
+
+        this.width = width;
+        this.height = height;
     }
 
-    public void render(int dW, int dH) {
+    public void render(int displayWidth, int displayHeight) {
         handleBackspace();
 
+        setupRender(displayWidth, displayHeight);
+
+        if (toggled) {
+            renderInput(displayWidth, displayHeight);
+        }
+
+        renderMessages(displayHeight);
+
+        endRender();
+    }
+
+    private void renderInput(int displayWidth, int displayHeight) {
+        drawRect(0, displayHeight - INPUT_HEIGHT, displayWidth, INPUT_HEIGHT, 0f, 0f, 0f, 0.3f);
+
+        if (selected && !input.isEmpty()) {
+            int start = 5 + font.getStringWidth("> ");
+            int end = start + font.getStringWidth(input);
+
+            drawRect(start, displayHeight - INPUT_HEIGHT + 2, end - start, INPUT_HEIGHT - 4, 0.2f, 0.6f, 1f, 0.5f);
+        }
+
+        font.drawString("> " + input, 5, displayHeight - INPUT_HEIGHT - 1, true);
+    }
+
+    private void renderMessages(int displayHeight) {
+        int offsetY = displayHeight - 50;
+
+        long now = System.currentTimeMillis();
+
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+
+            if (!toggled && now - msg.time > MESSAGE_LIFETIME) {
+                continue;
+            }
+
+            String text = msg.system ? msg.author + " " + msg.message : "<" + msg.author + "> " + msg.message;
+
+            List<String> lines = wrap(text, width - 10);
+
+            for (int j = lines.size() - 1; j >= 0; j--) {
+                drawRect(0, offsetY, width, LINE_HEIGHT, 0f, 0f, 0f, 0.3f);
+
+                font.drawString(lines.get(j), 5, offsetY - 1, msg.system ? Color.YELLOW : Color.WHITE, true);
+
+                offsetY -= LINE_HEIGHT;
+
+                if (offsetY < 0) {
+                    return;
+                }
+            }
+        }
+    }
+
+    public void handleKey(int key, char character) throws IOException {
+        if (!toggled) {
+            return;
+        }
+
+        boolean ctrl = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
+
+        if (ctrl) {
+            switch (key) {
+                case Keyboard.KEY_A:
+                    selected = true;
+                    return;
+
+                case Keyboard.KEY_C:
+                    copy(input);
+                    return;
+
+                case Keyboard.KEY_V:
+                    if (selected) {
+                        input = "";
+                        selected = false;
+                    }
+
+                    input += paste();
+                    return;
+            }
+        }
+
+        switch (key) {
+
+            case Keyboard.KEY_RETURN:
+                sendMessage();
+                return;
+
+            case Keyboard.KEY_ESCAPE:
+                close();
+                return;
+
+            case Keyboard.KEY_BACK:
+                backspace();
+
+                backspaceStart = System.currentTimeMillis();
+                lastBackspace = backspaceStart;
+                return;
+        }
+
+        if (!ctrl && Character.isDefined(character) && !Character.isISOControl(character)) {
+
+            if (selected) {
+                input = "";
+                selected = false;
+            }
+
+            input += character;
+        }
+    }
+
+    private void sendMessage() throws IOException {
+        if (!input.isEmpty()) {
+            SocketClient.sendChat(Minecraft.mc.username, input);
+            input = "";
+        }
+
+        toggled = false;
+        selected = false;
+    }
+
+    private void close() {
+        input = "";
+        toggled = false;
+        selected = false;
+    }
+
+    private void backspace() {
+        if (selected) {
+            input = "";
+            selected = false;
+            return;
+        }
+
+        if (!input.isEmpty()) {
+            input = input.substring(0, input.length() - 1);
+        }
+    }
+
+    private void handleBackspace() {
+        if (!toggled || !Keyboard.isKeyDown(Keyboard.KEY_BACK) || selected) {
+            backspaceStart = 0;
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        if (now - backspaceStart < BACKSPACE_DELAY) {
+            return;
+        }
+
+        if (now - lastBackspace >= BACKSPACE_REPEAT) {
+
+            if (!input.isEmpty()) {
+                input = input.substring(0, input.length() - 1);
+            }
+
+            lastBackspace = now;
+        }
+    }
+
+    private List<String> wrap(String text, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+
+        StringBuilder line = new StringBuilder();
+
+        for (String word : text.split(" ")) {
+
+            String test = line.length() == 0
+                    ? word
+                    : line + " " + word;
+
+            if (font.getStringWidth(test) <= maxWidth) {
+                if (line.length() > 0) {
+                    line.append(" ");
+                }
+
+                line.append(word);
+                continue;
+            }
+
+            if (line.length() > 0) {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+
+            for (char c : word.toCharArray()) {
+
+                if (font.getStringWidth(line.toString() + c) > maxWidth) {
+                    lines.add(line.toString());
+                    line.setLength(0);
+                }
+
+                line.append(c);
+            }
+        }
+
+        if (line.length() > 0) {
+            lines.add(line.toString());
+        }
+
+        return lines;
+    }
+
+    private void drawRect(float x, float y, float width, float height, float r, float g, float b, float a) {
+        glDisable(GL_TEXTURE_2D);
+        glColor4f(r, g, b, a);
+
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+
+        glEnable(GL_TEXTURE_2D);
+    }
+
+    private void setupRender(int width, int height) {
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
-        glOrtho(0, dW, dH, 0, -1, 1);
+
+        glOrtho(0, width, height, 0, -1, 1);
 
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -54,273 +285,79 @@ public class Chat {
 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
-        glDisable(GL_TEXTURE_2D);
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
 
-        if (toggled) {
-            int inputBarHeight = 20;
-
-            glDisable(GL_TEXTURE_2D);
-            glColor4f(0f, 0f, 0f, 0.3f);
-            glBegin(GL_QUADS);
-            glVertex2f(0, dH - inputBarHeight);
-            glVertex2f(dW, dH - inputBarHeight);
-            glVertex2f(dW, dH);
-            glVertex2f(0, dH);
-            glEnd();
-            glEnable(GL_TEXTURE_2D);
-
-            int inputTextY = (int) ((dH - inputBarHeight) - 1);
-
-            if (isSelected && !chatInput.isEmpty()) {
-                int prefixWidth = fontRenderer.getStringWidth("> ");
-                int textWidth = fontRenderer.getStringWidth(chatInput);
-
-                int selectX1 = 5 + prefixWidth;
-                int selectX2 = selectX1 + textWidth;
-                int selectY1 = dH - inputBarHeight + 2;
-                int selectY2 = dH - 2;
-
-                glDisable(GL_TEXTURE_2D);
-                glColor4f(0.2f, 0.6f, 1.0f, 0.5f);
-                glBegin(GL_QUADS);
-                glVertex2f(selectX1, selectY1);
-                glVertex2f(selectX2, selectY1);
-                glVertex2f(selectX2, selectY2);
-                glVertex2f(selectX1, selectY2);
-                glEnd();
-                glEnable(GL_TEXTURE_2D);
-            }
-
-            fontRenderer.drawString("> " + chatInput, 5, inputTextY, true);
-        }
-
-        int lineHeight = 21;
-        int offsetY = dH - 20 - 30;
-        long now = System.currentTimeMillis();
-        long messageLifetime = 5000;
-
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessage msg = messages.get(i);
-
-            if (!toggled && now - msg.timestamp > messageLifetime) continue;
-
-            String fullText = msg.connectionMessage ?
-                    msg.author + " " + msg.message :
-                    "<" + msg.author + "> " + msg.message;
-
-            List<String> wrappedLines = wrapText(fullText, w - 10);
-
-            for (int j = wrappedLines.size() - 1; j >= 0; j--) {
-                float boxTop = offsetY;
-                float boxBottom = offsetY + lineHeight;
-
-                glDisable(GL_TEXTURE_2D);
-                glColor4f(0f, 0f, 0f, 0.3f);
-                glBegin(GL_QUADS);
-                glVertex2f(0, boxTop);
-                glVertex2f(w, boxTop);
-                glVertex2f(w, boxBottom);
-                glVertex2f(0, boxBottom);
-                glEnd();
-                glEnable(GL_TEXTURE_2D);
-
-                int msgTextY = (int) (boxTop - 1);
-
-                Color color = msg.connectionMessage ? Color.YELLOW : Color.WHITE;
-                fontRenderer.drawString(wrappedLines.get(j), 5, msgTextY, color, true);
-
-                offsetY -= lineHeight;
-                if (offsetY < 0) break;
-            }
-
-            if (offsetY < 0) break;
-        }
-
+    private void endRender() {
         glDisable(GL_BLEND);
+
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
 
         glPopMatrix();
+
         glMatrixMode(GL_PROJECTION);
         glPopMatrix();
+
         glMatrixMode(GL_MODELVIEW);
     }
 
-    public void handleKey(int key, char character) throws IOException {
-        if (!toggled) return;
-
-        boolean isCtrlDown = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
-
-        if (isCtrlDown) {
-            if (key == Keyboard.KEY_A) {
-                isSelected = true;
-                return;
-            }
-            if (key == Keyboard.KEY_C) {
-                setClipboardString(chatInput);
-                return;
-            }
-            if (key == Keyboard.KEY_V) {
-                if (isSelected) {
-                    chatInput = "";
-                    isSelected = false;
-                }
-                chatInput += getClipboardString();
-                return;
-            }
-        }
-
-        switch (key) {
-            case Keyboard.KEY_RETURN:
-                if (!chatInput.isEmpty()) {
-                    SocketClient.sendChat(Minecraft.mc.username, chatInput);
-                    chatInput = "";
-                }
-                toggled = false;
-                isSelected = false;
-                break;
-
-            case Keyboard.KEY_ESCAPE:
-                chatInput = "";
-                toggled = false;
-                isSelected = false;
-                break;
-
-            case Keyboard.KEY_BACK:
-                if (isSelected) {
-                    chatInput = "";
-                    isSelected = false;
-                } else if (!chatInput.isEmpty()) {
-                    chatInput = chatInput.substring(0, chatInput.length() - 1);
-                }
-                backspacePressedTime = System.currentTimeMillis();
-                lastBackspaceTime = System.currentTimeMillis();
-                break;
-
-            default:
-                if (!isCtrlDown && Character.isDefined(character) && !Character.isISOControl(character)) {
-                    if (isSelected) {
-                        chatInput = "";
-                        isSelected = false;
-                    }
-                    chatInput += character;
-                }
-                break;
-        }
-    }
-
-    private void handleBackspace() {
-        if (toggled && Keyboard.isKeyDown(Keyboard.KEY_BACK)) {
-            if (isSelected) return;
-
-            long now = System.currentTimeMillis();
-            long timeElapsed = now - backspacePressedTime;
-
-            if (timeElapsed > INITIAL_BACKSPACE_DELAY) {
-                if (now - lastBackspaceTime > REPEAT_BACKSPACE_DELAY) {
-                    if (!chatInput.isEmpty()) {
-                        chatInput = chatInput.substring(0, chatInput.length() - 1);
-                    }
-                    lastBackspaceTime = now;
-                }
-            }
-        } else {
-            backspacePressedTime = 0;
-        }
-    }
-
-    private List<String> wrapText(String text, int maxWidth) {
-        List<String> lines = new ArrayList<>();
-        StringBuilder currentLine = new StringBuilder();
-
-        String[] words = text.split(" ");
-
-        for (int i = 0; i < words.length; i++) {
-            String word = words[i];
-
-            if (i > 0) {
-                if (fontRenderer.getStringWidth(currentLine.toString() + " ") > maxWidth) {
-                    lines.add(currentLine.toString());
-                    currentLine = new StringBuilder();
-                } else {
-                    currentLine.append(" ");
-                }
-            }
-
-            for (int j = 0; j < word.length(); j++) {
-                char c = word.charAt(j);
-
-                if (fontRenderer.getStringWidth(currentLine.toString() + c) > maxWidth) {
-                    lines.add(currentLine.toString());
-                    currentLine = new StringBuilder();
-                }
-
-                currentLine.append(c);
-            }
-        }
-
-        if (currentLine.length() > 0) {
-            lines.add(currentLine.toString());
-        }
-
-        return lines;
-    }
-
-    private String getClipboardString() {
+    private String paste() {
         try {
             return (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             return "";
         }
     }
 
-    private void setClipboardString(String text) {
+    private void copy(String text) {
         try {
-            StringSelection selection = new StringSelection(text);
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
-        } catch (Exception ignored) {}
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+        } catch (Exception ignored) {
+        }
     }
 
     public void addMessage(String author, String message) {
-        ChatMessage msg = new ChatMessage(author, message, false);
-        messages.add(msg);
-
-        if (messages.size() >= messageLimit) {
-            messages.remove(0);
-        }
+        add(new ChatMessage(author, message, false));
     }
 
     public void addConnectionMessage(String player, int type) {
-        String action = (type == 0) ? "joined" : "left";
-        ChatMessage msg = new ChatMessage(player, action + " the game", true);
-        messages.add(msg);
-
-        if (messages.size() >= messageLimit) {
-            messages.remove(0);
-        }
+        add(new ChatMessage(
+                player,
+                (type == 0 ? "joined" : "left") + " the game",
+                true
+        ));
     }
 
-    public static class ChatMessage {
-        public String author;
-        public String message;
-        public long timestamp;
-        public boolean connectionMessage;
+    private void add(ChatMessage message) {
+        messages.add(message);
 
-        public ChatMessage(String author, String message, boolean connectionMessage) {
-            this.author = author;
-            this.message = message;
-            this.timestamp = System.currentTimeMillis();
-            this.connectionMessage = connectionMessage;
+        while (messages.size() > maxMessages) {
+            messages.remove(0);
         }
     }
 
     public void setToggled(boolean toggled) {
         this.toggled = toggled;
+
         if (!toggled) {
-            this.isSelected = false;
+            selected = false;
+        }
+    }
+
+    public static class ChatMessage {
+        public final String author;
+        public final String message;
+
+        public final boolean system;
+        public final long time = System.currentTimeMillis();
+
+        public ChatMessage(String author, String message, boolean system) {
+            this.author = author;
+            this.message = message;
+            this.system = system;
         }
     }
 }
