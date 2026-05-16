@@ -3,26 +3,36 @@ package server.net;
 import global.Packets;
 import server.Server;
 import server.client.Client;
+import server.client.ChunkTracker;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Broadcaster {
 
+    private static final double VISIBILITY_RANGE = ChunkTracker.RENDER_DISTANCE * 16;
+
+    private static boolean inRange(Client a, Client b) {
+        double[] posA = a.getLastPos();
+        double[] posB = b.getLastPos();
+        if (posA == null || posB == null) return false;
+        double dx = posA[0] - posB[0];
+        double dz = posA[2] - posB[2];
+        return (dx * dx + dz * dz) <= VISIBILITY_RANGE * VISIBILITY_RANGE;
+    }
+
     public static void broadcastBlock(byte packet, int x, int y, int z, int blockId) {
         for (Client c : Server.clients) {
-          c.send(o -> {
-               o.writeByte(packet);
-               o.writeInt(x); o.writeInt(y); o.writeInt(z);
-               if (packet == Packets.BLOCK_PLACE) o.writeByte(blockId);
-           });
-       }
+            c.send(o -> {
+                o.writeByte(packet);
+                o.writeInt(x); o.writeInt(y); o.writeInt(z);
+                if (packet == Packets.BLOCK_PLACE) o.writeByte(blockId);
+            });
+        }
     }
 
     public static void broadcastBlock(byte packet, int x, int y, int z) {
-       broadcastBlock(packet, x, y, z, 0);
+        broadcastBlock(packet, x, y, z, 0);
     }
-
 
     public static void broadcastConnection(int type, Client sender) {
         for (Client client : Server.clients) {
@@ -48,12 +58,25 @@ public class Broadcaster {
     public static void broadcastPos(Client sender, double x, double y, double z, float yaw, int ping) {
         for (Client client : Server.clients) {
             if (client == sender) continue;
+
+            final double sx, sy, sz;
+            if (inRange(client, sender)) {
+                sx = x;
+                sy = y;
+                sz = z;
+            } else {
+                ThreadLocalRandom rng = ThreadLocalRandom.current();
+                sx = rng.nextDouble(-100000, 100000);
+                sy = rng.nextDouble(-100000, 100000);
+                sz = rng.nextDouble(-100000, 100000);
+            }
+
             client.send(o -> {
                 o.writeByte(Packets.POS);
                 o.writeUTF(sender.getUsername());
-                o.writeDouble(x);
-                o.writeDouble(y);
-                o.writeDouble(z);
+                o.writeDouble(sx);
+                o.writeDouble(sy);
+                o.writeDouble(sz);
                 o.writeFloat(yaw);
                 o.writeInt(ping);
             });
