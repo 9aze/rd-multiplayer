@@ -81,9 +81,10 @@ public class ClientHandler {
 
                 switch (packetId) {
                     case Packets.REQUEST_LEVEL: {
-                        double spawnX = 128.0;
-                        double spawnY = Server.level.getDepth() + 3.0;
-                        double spawnZ = 128.0;
+                        double[] spawnPos = findSpawnPosition();
+                        double spawnX = spawnPos[0];
+                        double spawnY = spawnPos[1];
+                        double spawnZ = spawnPos[2];
 
                         final Client c = client;
 
