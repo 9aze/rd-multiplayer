@@ -51,6 +51,7 @@ public class Chat {
     }
 
     public void render(int displayWidth, int displayHeight) {
+        if(!Minecraft.mc.info.hudEnabled) return;
         handleBackspace();
 
         setupRender(displayWidth, displayHeight);
