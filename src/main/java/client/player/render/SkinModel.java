@@ -1,4 +1,4 @@
-package client;
+package client.player.render;
 
 public final class SkinModel {
 
@@ -7,7 +7,6 @@ public final class SkinModel {
     public static float[][] makeFaces(int topLeftU, int topLeftV, int w, int h, int d) {
         float[][] faces = new float[6][4];
 
-        // BOTTOM (-Y) — second small rect on top row
         faces[0] = norm(topLeftU + d + w, topLeftV,         topLeftU + d + 2*w, topLeftV + d);
         // TOP    (+Y) — first small rect on top row
         faces[1] = norm(topLeftU + d,     topLeftV,         topLeftU + d + w,   topLeftV + d);

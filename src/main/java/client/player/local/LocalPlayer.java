@@ -1,5 +1,6 @@
-package client;
+package client.player.local;
 
+import client.Minecraft;
 import client.level.Level;
 import client.net.SocketClient;
 import client.phys.AABB;
@@ -9,8 +10,7 @@ import org.lwjgl.input.Keyboard;
 import java.io.IOException;
 import java.util.List;
 
-public class Player {
-
+public class LocalPlayer {
     private final Level level;
 
     public double x, y, z;
@@ -34,7 +34,7 @@ public class Player {
     private long lastSpacePress = 0L;
     private static final long DOUBLE_SPACE_TIME = 300L;
 
-    public Player(Level level) {
+    public LocalPlayer(Level level) {
         this.level = level;
 
         resetPosition();
@@ -120,7 +120,7 @@ public class Player {
                 }
 
                 if (key == Keyboard.KEY_F5 && !Minecraft.mc.chat.toggled) {
-                    Minecraft.mc.cycleCamera();
+                    Minecraft.mc.camera.cycle();
                 }
 
                 if (key == Keyboard.KEY_SPACE && !Minecraft.mc.chat.toggled) {

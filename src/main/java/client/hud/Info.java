@@ -4,6 +4,8 @@ import client.*;
 import client.level.Blocks;
 import client.level.FaceTextures;
 import client.level.Tile;
+import client.player.local.LocalPlayer;
+import client.player.remote.RemotePlayer;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
@@ -65,7 +67,7 @@ public class Info {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        Player p = Minecraft.mc.player;
+        LocalPlayer p = Minecraft.mc.localPlayer;
 
         font.drawString(String.format("XYZ: %.0f %.0f %.0f", p.x, p.y, p.z), 5, 2, true);
         font.drawString("FPS: " + Minecraft.mc.fps, 5, 22, true);
@@ -131,13 +133,12 @@ public class Info {
     }
 
     private void drawTablist(int w) {
-        Map<String, Position> players = new TreeMap<>(Minecraft.mc.playerManager.getPlayers());
-
-        players.put(Minecraft.mc.username, new Position(0,0,0,0,(int) Minecraft.mc.rtt));
+        Map<String, RemotePlayer> players = new TreeMap<>(Minecraft.mc.playerManager.getPlayers());
+        players.put(Minecraft.mc.username, new RemotePlayer(Minecraft.mc.username, 0,0,0,0,(int) Minecraft.mc.rtt));
 
         int widest = 0;
 
-        for (Map.Entry<String, Position> e : players.entrySet())
+        for (Map.Entry<String, RemotePlayer> e : players.entrySet())
             widest = Math.max(widest, font.getStringWidth(e.getKey() + "   " + e.getValue().ping + "ms"));
 
         int x = w / 2 - widest / 2, y = 10;
@@ -149,7 +150,7 @@ public class Info {
 
         glEnable(GL_TEXTURE_2D);
 
-        for (Map.Entry<String, Position> e : players.entrySet()) {
+        for (Map.Entry<String, RemotePlayer> e : players.entrySet()) {
 
             int ping = e.getValue().ping;
             Color pingColor = ping >= 250 ? Color.RED : ping >= 150 ? Color.ORANGE : Color.GREEN;

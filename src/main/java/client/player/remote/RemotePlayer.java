@@ -1,6 +1,8 @@
-package client;
+package client.player.remote;
 
-public class Position {
+public class RemotePlayer {
+    public String username;
+
     public double x, y, z;
     public float yaw;
     public float pitch;
@@ -15,7 +17,8 @@ public class Position {
     public long lastAnimTime;
     public double prevAnimX, prevAnimZ;
 
-    public Position(double x, double y, double z, float yaw, int ping) {
+    public RemotePlayer(String username, double x, double y, double z, float yaw, int ping) {
+        this.username = username;
         this.x = x;
         this.y = y;
         this.z = z;

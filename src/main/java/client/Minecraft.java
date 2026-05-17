@@ -6,7 +6,9 @@ import client.hud.Info;
 import client.level.Chunk;
 import client.level.Level;
 import client.level.LevelRenderer;
-import client.net.PlayerManager;
+import client.player.local.Camera;
+import client.player.local.LocalPlayer;
+import client.player.remote.PlayerManager;
 import global.Packets;
 import client.net.SocketClient;
 import org.lwjgl.BufferUtils;
@@ -25,8 +27,6 @@ import java.nio.IntBuffer;
 import java.util.Properties;
 
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.util.glu.GLU.gluPerspective;
-import static org.lwjgl.util.glu.GLU.gluPickMatrix;
 
 public class Minecraft implements Runnable {
     public static Minecraft mc;
@@ -52,7 +52,7 @@ public class Minecraft implements Runnable {
 
     public Level level;
     public LevelRenderer levelRenderer;
-    public Player player;
+    public LocalPlayer localPlayer;
 
     public volatile boolean levelReady = false;
 
@@ -77,34 +77,26 @@ public class Minecraft implements Runnable {
 
     private Crosshair crosshair;
     public Info info;
-    public  int fps;
+    public int fps;
 
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
 
-    public int width  = 1280;
+    public int width = 1280;
     public int height = 720;
     private boolean fullscreen = false;
 
-    public static final int CAMERA_FIRST  = 0;
-    public static final int CAMERA_THIRD  = 1;
-    public static final int CAMERA_SECOND = 2;
-    private static final float CAMERA_DISTANCE = 4.0f;
+    public Camera camera;
 
-    public int cameraMode = CAMERA_FIRST;
-
-    public void cycleCamera() {
-        cameraMode = (cameraMode + 1) % 3;
-    }
-
-    private final IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
+
+    private int loadingBackground = -1;
 
     public Minecraft(String ip, int port, String username) throws IOException {
         mc = this;
         this.username = username;
         this.socket = new SocketClient(ip, port, username);
-        this.socketThread  = new Thread(socket);
+        this.socketThread = new Thread(socket);
         this.playerManager = new PlayerManager();
         this.level = new Level(64);
     }
@@ -173,26 +165,22 @@ public class Minecraft implements Runnable {
 
         if (levelRenderer == null) {
             levelRenderer = new LevelRenderer(level);
-            player = new Player(level);
+            localPlayer = new LocalPlayer(level);
+            camera = new Camera(this);
             level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
         }
 
         keepAlive();
 
-        int  frames   = 0;
+        int frames = 0;
         long lastTime = System.currentTimeMillis();
 
         try {
             while (!Display.isCloseRequested()) {
-
                 if (Display.wasResized()) {
                     width = Display.getWidth();
                     height = Display.getHeight();
-
-                    if (height <= 0) {
-                        height = 1;
-                    }
-
+                    if (height <= 0) height = 1;
                     glViewport(0, 0, width, height);
                 }
 
@@ -215,13 +203,14 @@ public class Minecraft implements Runnable {
             destroy();
         }
     }
-  
+
     private void applyPendingLevel() {
         if (!levelUpdatePending) return;
         this.level = new Level(pendingDepth);
         this.level.loadLevel(pendingWidth, pendingHeight, pendingDepth, pendingBlocks);
         this.levelRenderer = new LevelRenderer(this.level);
-        this.player = new Player(this.level);
+        this.localPlayer = new LocalPlayer(this.level);
+        this.camera = new Camera(this);
         this.levelRenderer.rebuildAll();
         levelUpdatePending = false;
         System.out.println("Level loaded from server (legacy LEVEL_DATA)!");
@@ -231,8 +220,7 @@ public class Minecraft implements Runnable {
         info.tickKeys();
         info.tickScroll();
 
-
-        if(Keyboard.isKeyDown(Keyboard.KEY_F11)) {
+        if (Keyboard.isKeyDown(Keyboard.KEY_F11)) {
             toggleFullscreen();
         }
 
@@ -240,103 +228,46 @@ public class Minecraft implements Runnable {
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
         }
-        if (player != null) player.tick();
+        if (localPlayer != null) localPlayer.tick();
     }
 
     private void toggleFullscreen() {
         try {
             fullscreen = !fullscreen;
-
             if (fullscreen) {
-                Display.setDisplayModeAndFullscreen(
-                        Display.getDesktopDisplayMode()
-                );
+                Display.setDisplayModeAndFullscreen(Display.getDesktopDisplayMode());
             } else {
                 Display.setFullscreen(false);
                 Display.setDisplayMode(new DisplayMode(1280, 720));
             }
-
             width = Display.getWidth();
             height = Display.getHeight();
-
             glViewport(0, 0, width, height);
-
         } catch (LWJGLException e) {
             e.printStackTrace();
         }
-    }
-
-    private void moveCameraToPlayer(float pt) {
-        glTranslatef(0f, 0f, -0.3f);
-
-        if (cameraMode != CAMERA_FIRST) {
-            glTranslatef(0f, 0f, -CAMERA_DISTANCE);
-        }
-
-        float pitch = (cameraMode == CAMERA_SECOND) ? -player.xRotation : player.xRotation;
-        glRotatef(pitch, 1f, 0f, 0f);
-        glRotatef(player.yRotation, 0f, 1f, 0f);
-
-        if (cameraMode == CAMERA_SECOND) {
-            glRotatef(180f, 0f, 1f, 0f);
-        }
-
-        double x = player.prevX + (player.x - player.prevX) * pt;
-        double y = player.prevY + (player.y - player.prevY) * pt;
-        double z = player.prevZ + (player.z - player.prevZ) * pt;
-        glTranslated(-x, -y, -z);
-    }
-
-    private void setupCamera(float pt) {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(70, width / (float) height, 0.05F, 1000);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        moveCameraToPlayer(pt);
-    }
-
-    private void setupPickCamera(float pt, int x, int y) {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        viewportBuffer.clear();
-        glGetInteger(GL_VIEWPORT, viewportBuffer);
-        viewportBuffer.flip();
-        viewportBuffer.limit(16);
-        gluPickMatrix(x, y, 5f, 5f, viewportBuffer);
-        gluPerspective(70f, width / (float) height, 0.05f, 1000f);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-
-        // Always pick from the player's actual eye, never from the offset 3rd/2nd
-        // person camera — otherwise you'd target blocks based on where the camera
-        // is, not where the player would reach.
-        int saved = cameraMode;
-        cameraMode = CAMERA_FIRST;
-        moveCameraToPlayer(pt);
-        cameraMode = saved;
     }
 
     private void pick(float pt) {
         selectBuffer.clear();
         glSelectBuffer(selectBuffer);
         glRenderMode(GL_SELECT);
-        setupPickCamera(pt, width / 2, height / 2);
-        levelRenderer.pick(player);
+        camera.setupPick(pt, width / 2, height / 2);
+        levelRenderer.pick(localPlayer);
         selectBuffer.flip();
         selectBuffer.limit(selectBuffer.capacity());
 
         long closest = 0L;
-        int[] names  = new int[10];
-        int   hitNameCount = 0;
+        int[] names = new int[10];
+        int hitNameCount = 0;
 
         int hits = glRenderMode(GL_RENDER);
         for (int hi = 0; hi < hits; hi++) {
-            int  nameCount = selectBuffer.get();
-            long minZ      = selectBuffer.get();
+            int nameCount = selectBuffer.get();
+            long minZ = selectBuffer.get();
             selectBuffer.get();
             if (minZ < closest || hi == 0) {
-                closest      = minZ;
+                closest = minZ;
                 hitNameCount = nameCount;
                 for (int ni = 0; ni < nameCount; ni++) names[ni] = selectBuffer.get();
             } else {
@@ -353,13 +284,11 @@ public class Minecraft implements Runnable {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         boolean worldReady = (levelReady || !levelUpdatePending)
-                && level != null && levelRenderer != null && player != null
+                && level != null && levelRenderer != null && localPlayer != null
                 && level.hasAnyChunk();
 
         if (worldReady) {
-            float motionX = Mouse.getDX();
-            float motionY = Mouse.getDY();
-            player.turn(motionX, motionY);
+            localPlayer.turn(Mouse.getDX(), Mouse.getDY());
 
             pick(pt);
 
@@ -377,19 +306,19 @@ public class Minecraft implements Runnable {
                         if (hitResult.face == 4) x--;
                         if (hitResult.face == 5) x++;
 
-                        float pMinX = (float)(player.x - player.width),  pMaxX = (float)(player.x + player.width);
-                        float pMinY = (float)(player.y - player.height), pMaxY = (float)(player.y + player.height);
-                        float pMinZ = (float)(player.z - player.width),  pMaxZ = (float)(player.z + player.width);
+                        float pMinX = (float)(localPlayer.x - localPlayer.width), pMaxX = (float)(localPlayer.x + localPlayer.width);
+                        float pMinY = (float)(localPlayer.y - localPlayer.height), pMaxY = (float)(localPlayer.y + localPlayer.height);
+                        float pMinZ = (float)(localPlayer.z - localPlayer.width), pMaxZ = (float)(localPlayer.z + localPlayer.width);
                         boolean intersects =
                                 pMaxX > x && pMinX < x+1 &&
-                                pMaxY > y && pMinY < y+1 &&
-                                pMaxZ > z && pMinZ < z+1;
+                                        pMaxY > y && pMinY < y+1 &&
+                                        pMaxZ > z && pMinZ < z+1;
                         if (!intersects) SocketClient.sendBlock(Packets.BLOCK_PLACE, x, y, z, info.getSelectedBlockId());
                     }
                 }
             }
 
-            setupCamera(pt);
+            camera.setup(pt);
 
             glEnable(GL_FOG);
             glFogi(GL_FOG_MODE, GL_LINEAR);
@@ -402,10 +331,10 @@ public class Minecraft implements Runnable {
             glEnable(GL_FOG);
             levelRenderer.render(1);
             levelRenderer.renderPlayers(playerManager);
-            if (cameraMode != CAMERA_FIRST) {
-                levelRenderer.renderSelf(player, playerManager);
+            if (camera.mode != Camera.FIRST) {
+                levelRenderer.renderSelf(localPlayer, playerManager);
             }
-            levelRenderer.renderNameTags(playerManager, player, font);
+            levelRenderer.renderNameTags(playerManager, localPlayer, font);
             glDisable(GL_TEXTURE_2D);
 
             if (hitResult != null) levelRenderer.renderHit(hitResult);
@@ -414,7 +343,6 @@ public class Minecraft implements Runnable {
             crosshair.render(width, height);
             info.render(width, height);
             chat.render(width, height);
-
         } else {
             glClearColor(0, 0, 0, 1);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -440,8 +368,6 @@ public class Minecraft implements Runnable {
         t.start();
     }
 
-    private int loadingBackground = -1;
-
     private void renderLoadingScreen() {
         if (loadingBackground == -1) {
             loadingBackground = Textures.loadTexture("/client/textures/background.png", GL_NEAREST);
@@ -455,21 +381,21 @@ public class Minecraft implements Runnable {
         glPushMatrix(); glLoadIdentity();
 
         glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-        glEnable(GL_TEXTURE_2D);  glEnable(GL_BLEND);
+        glEnable(GL_TEXTURE_2D); glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glColor4f(1f, 1f, 1f, 1f);
         Textures.bind(loadingBackground);
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(0,     0);
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
         glTexCoord2f(1, 0); glVertex2f(width, 0);
         glTexCoord2f(1, 1); glVertex2f(width, height);
-        glTexCoord2f(0, 1); glVertex2f(0,     height);
+        glTexCoord2f(0, 1); glVertex2f(0, height);
         glEnd();
 
-        int textWidth  = font.getStringWidth(loadingText);
+        int textWidth = font.getStringWidth(loadingText);
         int textHeight = font.getStringHeight();
-        int tx = (width  / 2) - (textWidth  / 2);
+        int tx = (width / 2) - (textWidth / 2);
         int ty = (height / 2) - (textHeight / 2);
         glColor4f(1f, 1f, 1f, 1f);
         font.drawString(loadingText, tx, ty, loadingColor, true);
@@ -481,7 +407,7 @@ public class Minecraft implements Runnable {
 
         Display.update();
     }
-  
+
     public PlayerManager getPlayerManager() { return playerManager; }
     public Level getLevel() { return level; }
 }

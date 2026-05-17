@@ -142,7 +142,7 @@ public class SocketClient implements Runnable {
                         Minecraft.mc.spawnY = y;
                         Minecraft.mc.spawnZ = z;
                         Minecraft.mc.spawnReceived = true;
-                        if (Minecraft.mc.player != null) Minecraft.mc.player.forcePosition(x, y, z);
+                        if (Minecraft.mc.localPlayer != null) Minecraft.mc.localPlayer.forcePosition(x, y, z);
                         break;
                     }
 
@@ -176,7 +176,7 @@ public class SocketClient implements Runnable {
                         if (type == 1) {
                             Minecraft.mc.getPlayerManager().removePlayer(uname);
                         } else {
-                            if (Minecraft.mc.player != null) Minecraft.mc.player.sendPosition();
+                            if (Minecraft.mc.localPlayer != null) Minecraft.mc.localPlayer.sendPosition();
                         }
                         break;
                     }
