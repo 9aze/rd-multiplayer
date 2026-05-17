@@ -31,9 +31,13 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Properties;
 
 import static org.lwjgl.opengl.GL11.*;
@@ -98,8 +102,35 @@ public class Minecraft implements Runnable {
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
+        extractNativesIfJar();
         new Thread(new Minecraft()).start();
+    }
+
+    private static void extractNativesIfJar() throws Exception {
+        URL location = Minecraft.class.getProtectionDomain().getCodeSource().getLocation();
+        if (location == null || !location.getFile().endsWith(".jar")) return;
+
+        Path nativesDir = Files.createTempDirectory("lwjgl-natives-");
+        nativesDir.toFile().deleteOnExit();
+
+        String[] libs = getNativeLibs();
+        for (String lib : libs) {
+            try (InputStream in = Minecraft.class.getResourceAsStream("/natives/" + lib)) {
+                if (in != null) {
+                    Files.copy(in, nativesDir.resolve(lib), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        System.setProperty("org.lwjgl.librarypath", nativesDir.toAbsolutePath().toString());
+    }
+
+    private static String[] getNativeLibs() {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win"))  return new String[]{"lwjgl.dll", "lwjgl64.dll", "OpenAL32.dll", "OpenAL64.dll"};
+        if (os.contains("mac"))  return new String[]{"liblwjgl.jnilib", "openal.dylib"};
+        return new String[]{"liblwjgl.so", "liblwjgl64.so", "libopenal.so", "libopenal64.so"};
     }
 
     public Minecraft() throws IOException {
