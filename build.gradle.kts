@@ -24,7 +24,7 @@ dependencies {
 tasks.register<JavaExec>("runClient") {
     val nativesDir = project.layout.projectDirectory.dir("run/natives")
     jvmArgs = listOf("-Dorg.lwjgl.librarypath=${nativesDir.asFile.absolutePath}")
-    mainClass.set("client.Launcher")
+    mainClass.set("client.Minecraft")
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = project.layout.projectDirectory.dir("run").asFile
     doFirst { workingDir.mkdirs() }
@@ -74,7 +74,7 @@ tasks.register<Jar>("buildClient") {
     archiveClassifier.set("")
     destinationDirectory.set(project.layout.projectDirectory.dir("build/dist").asFile)
     manifest {
-        attributes("Main-Class" to "client.Launcher", "Implementation-Version" to gitCommitHash)
+        attributes("Main-Class" to "client.Minecraft", "Implementation-Version" to gitCommitHash)
     }
     from(sourceSets["main"].output)
     from(

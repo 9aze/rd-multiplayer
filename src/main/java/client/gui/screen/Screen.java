@@ -1,4 +1,4 @@
-package client.gui;
+package client.gui.screen;
 
 import client.FontRenderer;
 

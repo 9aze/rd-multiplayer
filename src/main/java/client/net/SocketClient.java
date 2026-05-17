@@ -1,7 +1,7 @@
 package client.net;
 
 import client.Minecraft;
-import client.gui.LoadingScreen;
+import client.gui.screen.impl.LoadingScreen;
 import client.level.Level;
 import global.Packets;
 

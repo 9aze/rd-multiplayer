@@ -1,15 +1,14 @@
-package client.gui;
+package client.gui.screen.impl;
 
 import client.FontRenderer;
 import client.Textures;
-import org.lwjgl.opengl.Display;
+import client.gui.screen.Screen;
 
 import java.awt.*;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11.GL_BLEND;
 import static org.lwjgl.opengl.GL11.GL_CULL_FACE;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
 import static org.lwjgl.opengl.GL11.GL_MODELVIEW;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;

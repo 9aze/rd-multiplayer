@@ -1,7 +1,8 @@
 package client;
 
-import client.gui.LoadingScreen;
-import client.gui.Screen;
+import client.gui.screen.impl.LoadingScreen;
+import client.gui.screen.impl.MenuScreen;
+import client.gui.screen.Screen;
 import client.hud.Chat;
 import client.hud.Crosshair;
 import client.hud.Info;
@@ -90,15 +91,23 @@ public class Minecraft implements Runnable {
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
 
-    private int loadingBackground = -1;
+    public static void main(String[] args) throws IOException {
+        new Thread(new Minecraft()).start();
+    }
 
-    public Minecraft(String ip, int port, String username) throws IOException {
+    public Minecraft() throws IOException {
         mc = this;
+    }
+
+    public void connect(String ip, int port, String username) {
         this.username = username;
         this.socket = new SocketClient(ip, port, username);
         this.socketThread = new Thread(socket);
         this.playerManager = new PlayerManager();
         this.level = new Level(64);
+
+        socketThread.start();
+        this.currentScreen = new LoadingScreen();
     }
 
     public void init() throws LWJGLException {
@@ -132,7 +141,7 @@ public class Minecraft implements Runnable {
         info = new Info(font);
         chat = new Chat(font, 50, 0, height - 150 - 16, 500, 150);
 
-        Mouse.setGrabbed(true);
+        Mouse.setGrabbed(false);
     }
 
     public void destroy() {
@@ -151,13 +160,13 @@ public class Minecraft implements Runnable {
             System.exit(0);
         }
 
-        currentScreen = new LoadingScreen();
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        currentScreen.render(font, width, height);
-        Display.update();
-
-        socketThread.start();
+        if(!(currentScreen instanceof LoadingScreen) && !levelReady) {
+            currentScreen = new MenuScreen();
+            glClearColor(0, 0, 0, 1);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            currentScreen.render(font, width, height);
+            Display.update();
+        }
 
         while (!levelReady) {
             if (Display.isCloseRequested()) destroy();
@@ -184,6 +193,11 @@ public class Minecraft implements Runnable {
             camera = new Camera(this);
             level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
             currentScreen = null;
+
+
+            Mouse.setGrabbed(true);
+            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+            while (Mouse.next()) {}
         }
 
         keepAlive();
@@ -206,7 +220,7 @@ public class Minecraft implements Runnable {
 
                 frames++;
                 while (System.currentTimeMillis() >= lastTime + 1000L) {
-                    System.out.println(frames + " fps, " + Chunk.updates);
+                    //System.out.println(frames + " fps, " + Chunk.updates);
                     fps = frames;
                     Chunk.updates = 0;
                     lastTime += 1000L;
@@ -222,14 +236,15 @@ public class Minecraft implements Runnable {
 
     private void applyPendingLevel() {
         if (!levelUpdatePending) return;
+
         this.level = new Level(pendingDepth);
         this.level.loadLevel(pendingWidth, pendingHeight, pendingDepth, pendingBlocks);
         this.levelRenderer = new LevelRenderer(this.level);
         this.localPlayer = new LocalPlayer(this.level);
         this.camera = new Camera(this);
         this.levelRenderer.rebuildAll();
+
         levelUpdatePending = false;
-        System.out.println("Level loaded from server (legacy LEVEL_DATA)!");
         currentScreen = null;
     }
 
@@ -306,10 +321,11 @@ public class Minecraft implements Runnable {
                 && level.hasAnyChunk();
 
         if (worldReady && currentScreen == null) {
-            localPlayer.turn(Mouse.getDX(), Mouse.getDY());
             pick(pt);
 
             while (Mouse.next()) {
+                localPlayer.turn(Mouse.getEventDX(), Mouse.getEventDY());
+
                 if (Mouse.getEventButtonState() && hitResult != null) {
                     if (Mouse.getEventButton() == 0) {
                         SocketClient.sendBlock(Packets.BLOCK_BREAK, hitResult.x, hitResult.y, hitResult.z);
@@ -384,6 +400,7 @@ public class Minecraft implements Runnable {
         t.start();
     }
 
+    public void setScreen(Screen screen) {this.currentScreen = screen;}
     public PlayerManager getPlayerManager() { return playerManager; }
     public Level getLevel() { return level; }
 }
