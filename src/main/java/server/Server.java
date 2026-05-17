@@ -37,6 +37,7 @@ public class Server {
     public static double  BREAK_RATE     = 5.0;    // breaks / sec
     public static int     RENDER_DISTANCE = 8;
     public static double  VOID_Y         = -32.0;
+    public static boolean LOGS = true;
 
     public static Level level;
     public static AuthDatabase authDb;
@@ -148,6 +149,7 @@ public class Server {
             BREAK_RATE      = Double.parseDouble (p.getProperty("break_rate",       "5.0"));
             RENDER_DISTANCE = Integer.parseInt   (p.getProperty("render_distance",  "8"));
             VOID_Y          = Double.parseDouble (p.getProperty("void_y",           "-32.0"));
+            LOGS            = Boolean.parseBoolean(p.getProperty("logs", "true"));
 
             System.out.println("Loaded server.properties");
         } catch (Exception e) {
