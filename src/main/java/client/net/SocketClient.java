@@ -272,7 +272,7 @@ public class SocketClient implements Runnable {
     }
 
     private void uploadSkinIfPresent() {
-        Path p = Paths.get("rd-skin.png");
+        Path p = Paths.get("skins/skin.png");
         if (!Files.exists(p)) return;
         try {
             byte[] png = Files.readAllBytes(p);
