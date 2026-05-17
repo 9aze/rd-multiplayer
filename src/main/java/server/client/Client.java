@@ -27,6 +27,9 @@ public class Client {
     private double breakTokens = 0.0;
     private long lastBreakTime = 0;
 
+    private double skinTokens = 0.0;
+    private long lastSkinTime = 0;
+
     public Client(String username, Socket socket, DataOutputStream out) {
         this.username = username;
         this.socket = socket;
@@ -79,7 +82,6 @@ public class Client {
         this.lastMoveTime = time;
     }
 
-    /** Records the latest yaw/pitch the client reported. Independent of move-time bookkeeping. */
     public void setLastRotation(float yaw, float pitch) {
         this.lastYaw = yaw;
         this.lastPitch = pitch;
@@ -102,6 +104,13 @@ public class Client {
     public void setBreakTokens(double tokens, long time) {
         this.breakTokens = tokens;
         this.lastBreakTime = time;
+    }
+
+    public double getSkinTokens() { return skinTokens; }
+    public long getLastSkinTime() { return lastSkinTime; }
+    public void setSkinTokens(double tokens, long time) {
+        this.skinTokens = tokens;
+        this.lastSkinTime = time;
     }
 
     @FunctionalInterface
