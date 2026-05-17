@@ -1,5 +1,6 @@
 package server;
 
+import global.Packets;
 import server.client.Client;
 import server.client.ClientHandler;
 import server.client.TimeoutHandler;
@@ -65,12 +66,10 @@ public class Server {
                 switch (parts[0]) {
                     case "kick":
                         String username = parts[1];
-                        Optional<Client> found = clients.stream()
-                                .filter(c -> c.getUsername().equals(username))
-                                .findFirst();
+                        Optional<Client> client = getClient(username);
 
-                        if (found.isPresent()) {
-                            found.get().close();
+                        if (client.isPresent()) {
+                            client.get().close();
                             System.out.println("Kicked " + username);
                         } else {
                             System.out.println("Player not found: " + username);
@@ -79,6 +78,29 @@ public class Server {
                     case "say":
                         String message = parts[1];
                         Broadcaster.broadcastChat("SERVER", message);
+                        break;
+                    case "tp":
+                        String[] arg = parts[1].split(" ", 4);
+
+                        client = getClient(arg[0]);
+                        try {
+                            client.ifPresent(c -> {
+                                double x = Double.parseDouble(arg[1]);
+                                double y = Double.parseDouble(arg[2]);
+                                double z = Double.parseDouble(arg[3]);
+                                c.setLastPos(x, y, z, System.currentTimeMillis());
+                                c.send(o -> {
+                                    o.writeByte(Packets.SET_POS);
+                                    o.writeDouble(x);
+                                    o.writeDouble(y);
+                                    o.writeDouble(z);
+                                });
+                            });
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        break;
+
                 }
             }
         });
@@ -91,6 +113,12 @@ public class Server {
                     + clientSocket.getInetAddress().getHostAddress());
             new Thread(() -> ClientHandler.handle(clientSocket)).start();
         }
+    }
+
+    private static Optional<Client> getClient(String username) {
+        return clients.stream()
+                .filter(c -> c.getUsername().equals(username))
+                .findFirst();
     }
 
     private static void loadProperties() {
