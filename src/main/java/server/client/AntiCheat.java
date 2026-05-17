@@ -22,19 +22,19 @@ public class AntiCheat {
             double dz = (blockZ + 0.5) - pos[2];
             double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
             if (dist > Server.MAX_REACH) {
-                System.out.printf("%s reach violation: %.1f units%n", client.getUsername(), dist);
+                if (Server.LOGS) System.out.printf("%s reach violation: %.1f units%n", client.getUsername(), dist);
                 return false;
             }
         }
 
         if (isPlace) {
             if (!consumePlaceToken(client, now)) {
-                System.out.printf("%s place-rate violation%n", client.getUsername());
+                if (Server.LOGS) System.out.printf("%s place-rate violation%n", client.getUsername());
                 return false;
             }
         } else {
             if (!consumeBreakToken(client, now)) {
-                System.out.printf("%s break-rate violation%n", client.getUsername());
+                if (Server.LOGS) System.out.printf("%s break-rate violation%n", client.getUsername());
                 return false;
             }
         }
@@ -66,7 +66,7 @@ public class AntiCheat {
         double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
         if (dist > tokens) {
-            System.out.printf("%s speed violation: tried to move %.2f blocks, only had %.2f tokens remaining%n",
+            if (Server.LOGS) System.out.printf("%s speed violation: tried to move %.2f blocks, only had %.2f tokens remaining%n",
                     client.getUsername(), dist, tokens);
             return false;
         }

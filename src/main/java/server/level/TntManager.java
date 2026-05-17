@@ -37,7 +37,7 @@ public final class TntManager {
             try {
                 explode(x, y, z);
             } catch (Throwable t) {
-                System.err.println("TNT explosion failed at " + x + "," + y + "," + z);
+                if (Server.LOGS) System.err.println("TNT explosion failed at " + x + "," + y + "," + z);
                 t.printStackTrace();
             } finally {
                 fusing.remove(key);

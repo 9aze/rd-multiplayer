@@ -1,5 +1,7 @@
 package server.level;
 
+import server.Server;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -168,7 +170,7 @@ public class LevelChunk {
             dirty = false;
             return true;
         } catch (IOException e) {
-            System.err.println("Failed to load " + p + ": " + e.getMessage());
+            if (Server.LOGS) System.err.println("Failed to load " + p + ": " + e.getMessage());
             return false;
         }
     }
@@ -183,7 +185,7 @@ public class LevelChunk {
             }
             dirty = false;
         } catch (IOException e) {
-            System.err.println("Failed to save " + p + ": " + e.getMessage());
+            if (Server.LOGS) System.err.println("Failed to save " + p + ": " + e.getMessage());
         }
     }
 
