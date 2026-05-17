@@ -462,11 +462,11 @@ public class Minecraft implements Runnable {
             pick(pt);
 
             while (Mouse.next()) {
-                if(Mouse.isGrabbed()) {
+                if (Mouse.isGrabbed() && !chat.toggled) {
                     localPlayer.turn(Mouse.getEventDX(), Mouse.getEventDY());
                 }
 
-                if (Mouse.getEventButtonState() && hitResult != null) {
+                if (Mouse.getEventButtonState() && hitResult != null && !chat.toggled) {
                     if (Mouse.getEventButton() == 0) {
                         SocketClient.sendBlock(Packets.BLOCK_BREAK, hitResult.x, hitResult.y, hitResult.z);
 
@@ -597,6 +597,8 @@ public class Minecraft implements Runnable {
                     Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     break;
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
         }, "KeepAliveThread");
