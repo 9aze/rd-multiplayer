@@ -1,6 +1,7 @@
 package server.client;
 
 import global.Packets;
+import server.auth.AuthDatabase;
 import server.net.Broadcaster;
 import server.Server;
 import server.level.Level;
@@ -50,7 +51,6 @@ public class ClientHandler {
                 return;
             }
 
-            // token authentication
             String existing = Server.authDb.getToken(username);
             String newTokenToSend = null;
 
@@ -58,9 +58,11 @@ public class ClientHandler {
                 newTokenToSend = Server.authDb.registerNewToken(username);
                 System.out.println("Registered new account: " + username);
             } else {
-                if (token == null || token.length() != TOKEN_LENGTH || !Server.authDb.verifyToken(username, token)) {
+                if (token == null || token.length() != TOKEN_LENGTH
+                        || !Server.authDb.verifyToken(username, token)) {
                     System.out.println("Rejected " + username + ": invalid/missing token");
-                    reject(out, socket, "That username is already registered on this server. Please pick another name.");
+                    reject(out, socket,
+                           "That username is already registered on this server. Please pick another name.");
                     return;
                 }
             }
@@ -107,8 +109,6 @@ public class ClientHandler {
             System.out.println("Client authenticated: " + username);
             Broadcaster.broadcastConnection(0, client);
 
-            // Send all currently-known skins to the new client so they see
-            // everyone correctly from the start.
             for (java.util.Map.Entry<String, byte[]> e : Server.skins.entrySet()) {
                 final String uname = e.getKey();
                 final byte[] png   = e.getValue();
@@ -126,10 +126,32 @@ public class ClientHandler {
                 switch (packetId) {
 
                     case Packets.REQUEST_LEVEL: {
-                        double[] spawnPos = findSpawnPosition();
-                        double spawnX = spawnPos[0];
-                        double spawnY = spawnPos[1];
-                        double spawnZ = spawnPos[2];
+                        AuthDatabase.SavedPosition saved = Server.authDb.getPosition(client.getUsername());
+
+                        final double spawnX, spawnY, spawnZ;
+                        final float  spawnYaw, spawnPitch;
+                        if (saved != null) {
+                            spawnX = saved.x;
+                            spawnY = saved.y;
+                            spawnZ = saved.z;
+                            spawnYaw = saved.yaw;
+                            spawnPitch = saved.pitch;
+                            System.out.printf("Restored %s at (%.1f, %.1f, %.1f)%n",
+                                    client.getUsername(), spawnX, spawnY, spawnZ);
+                        } else {
+                            double[] spawnPos = findSpawnPosition();
+                            spawnX = spawnPos[0];
+                            spawnY = spawnPos[1];
+                            spawnZ = spawnPos[2];
+                            spawnYaw = 0f;
+                            spawnPitch = 0f;
+                        }
+
+
+                        long now = System.currentTimeMillis();
+                        client.setLastPos(spawnX, spawnY, spawnZ, now);
+                        client.setMoveTokens(Server.MOVE_BURST, now);
+                        client.setLastRotation(spawnYaw, spawnPitch);
 
                         final Client c = client;
                         c.send(o -> {
@@ -194,6 +216,8 @@ public class ClientHandler {
                             break;
                         }
 
+                        client.setLastRotation(yaw, pitch);
+
                         final double fx = x, fz = z;
                         final Client c = client;
                         c.send(o -> chunkTracker.update(fx, fz, o));
@@ -232,7 +256,6 @@ public class ClientHandler {
                         if (len < 0 || len > MAX_SKIN_BYTES) {
                             System.out.println("Rejected SKIN_UPLOAD from "
                                     + client.getUsername() + ": invalid length " + len);
-                            // Drain so the stream stays aligned, then ignore.
                             if (len > 0 && len <= 10 * 1024 * 1024) in.skipBytes(len);
                             break;
                         }
@@ -256,6 +279,13 @@ public class ClientHandler {
         } finally {
             chunkTracker.clear();
             if (client != null) {
+                double[] pos = client.getLastPos();
+                if (pos != null) {
+                    Server.authDb.savePosition(client.getUsername(),
+                            pos[0], pos[1], pos[2],
+                            client.getLastYaw(), client.getLastPitch());
+                }
+
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
                 Server.skins.remove(client.getUsername());

@@ -16,6 +16,8 @@ public class Client {
     private final Thread sendThread;
 
     private double[] lastPos = null;
+    private float lastYaw = 0f;
+    private float lastPitch = 0f;
     private long lastMoveTime = 0;
     private double moveTokens = 10.0;
 
@@ -64,6 +66,8 @@ public class Client {
     public DataOutputStream getOut() { return out; }
 
     public double[] getLastPos() { return lastPos; }
+    public float getLastYaw() { return lastYaw; }
+    public float getLastPitch() { return lastPitch; }
     public long getLastMoveTime() { return lastMoveTime; }
     public double getMoveTokens() { return moveTokens; }
 
@@ -73,6 +77,12 @@ public class Client {
         lastPos[1] = y;
         lastPos[2] = z;
         this.lastMoveTime = time;
+    }
+
+    /** Records the latest yaw/pitch the client reported. Independent of move-time bookkeeping. */
+    public void setLastRotation(float yaw, float pitch) {
+        this.lastYaw = yaw;
+        this.lastPitch = pitch;
     }
 
     public void setMoveTokens(double tokens, long time) {
