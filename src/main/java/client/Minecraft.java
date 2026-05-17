@@ -6,6 +6,7 @@ import client.gui.screen.Screen;
 import client.hud.Chat;
 import client.hud.Crosshair;
 import client.hud.Info;
+import client.hud.PauseMenu;
 import client.level.Chunk;
 import client.level.Level;
 import client.level.LevelRenderer;
@@ -92,6 +93,7 @@ public class Minecraft implements Runnable {
 
     private Crosshair crosshair;
     public Info info;
+    public PauseMenu pauseMenu;
     public int fps;
 
     private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
@@ -218,6 +220,7 @@ public class Minecraft implements Runnable {
         font = new FontRenderer(minecraftFont);
         crosshair = new Crosshair(16, "/client/textures/crosshair.png");
         info = new Info(font);
+        pauseMenu = new PauseMenu();
         chat = new Chat(font, 50, 0, height - 150 - 16, 500, 150);
         skyRenderer.init();
 
@@ -358,6 +361,7 @@ public class Minecraft implements Runnable {
     }
 
     boolean f2WasDown = false;
+    boolean EscWasDown = false;
 
     private void tick() throws IOException {
         info.tickKeys();
@@ -366,6 +370,18 @@ public class Minecraft implements Runnable {
         if (Keyboard.isKeyDown(Keyboard.KEY_F11)) {
             toggleFullscreen();
         }
+
+        boolean escDown = Keyboard.isKeyDown(Keyboard.KEY_ESCAPE);
+        if (escDown && !EscWasDown) {
+            if(pauseMenu.visible) {
+                pauseMenu.visible = false;
+                Mouse.setGrabbed(true);
+            } else {
+                pauseMenu.visible = true;
+                Mouse.setGrabbed(false);
+            }
+        }
+        EscWasDown = escDown;
 
         boolean f2Down = Keyboard.isKeyDown(Keyboard.KEY_F2);
         if (f2Down && !f2WasDown) screenshot();
@@ -525,6 +541,7 @@ public class Minecraft implements Runnable {
             glDisable(GL_FOG);
             crosshair.render(width, height);
             info.render(width, height);
+            pauseMenu.render(font, width, height);
             chat.render(width, height);
         } else if (currentScreen != null) {
             currentScreen.render(font, width, height);
