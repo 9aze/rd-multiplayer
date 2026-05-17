@@ -7,12 +7,12 @@ public class AntiCheat {
     private static final double EYE_HEIGHT  = 1.6;
     private static final double PLACE_BURST = 5.0;
     private static final double BREAK_BURST = 5.0;
+    private static final double SKIN_BURST = 3.0;
+    private static final double SKIN_RATE  = 1.0 / 60.0;
 
     private AntiCheat() {}
 
-    public static boolean checkBlock(Client client,
-                                     int blockX, int blockY, int blockZ,
-                                     boolean isPlace, long now) {
+    public static boolean checkBlock(Client client, int blockX, int blockY, int blockZ, boolean isPlace, long now) {
         if (!Server.ANTICHEAT) return true;
 
         double[] pos = client.getLastPos();
@@ -113,6 +113,27 @@ public class AntiCheat {
         }
 
         client.setBreakTokens(tokens - 1.0, now);
+        return true;
+    }
+
+    public static boolean checkSkinUpload(Client client, long now) {
+        long lastRefill = client.getLastSkinTime();
+        double tokens = client.getSkinTokens();
+
+        if (lastRefill > 0) {
+            long elapsed = now - lastRefill;
+            tokens = Math.min(SKIN_BURST, tokens + elapsed * (SKIN_RATE / 1_000.0));
+        } else {
+            tokens = SKIN_BURST;
+        }
+
+        if (tokens < 1.0) {
+            client.setSkinTokens(tokens, now);
+            if (Server.LOGS) System.out.printf("%s skin-upload rate violation%n", client.getUsername());
+            return false;
+        }
+
+        client.setSkinTokens(tokens - 1.0, now);
         return true;
     }
 }

@@ -13,12 +13,15 @@ import java.nio.file.Path;
 import java.io.*;
 import java.net.Socket;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+
 public class ClientHandler {
 
     private static final int MAX_USERNAME_LENGTH = 15;
     private static final int MIN_USERNAME_LENGTH = 3;
     private static final int MAX_MESSAGE_LENGTH  = 256;
-    private static final int MAX_BLOCK_ID = 9;
+    private static final int MAX_BLOCK_ID = 7;
     private static final int MAX_SKIN_BYTES = 64 * 1024;
     private static final int TOKEN_LENGTH = 64;
 
@@ -282,14 +285,18 @@ public class ClientHandler {
 
                     case Packets.SKIN_UPLOAD: {
                         int len = in.readInt();
-                        if (len < 0 || len > MAX_SKIN_BYTES) {
-                            System.out.println("Rejected SKIN_UPLOAD from "
-                                    + client.getUsername() + ": invalid length " + len);
-                            if (len > 0 && len <= 10 * 1024 * 1024) in.skipBytes(len);
-                            break;
+                        if (len <= 0 || len > MAX_SKIN_BYTES) {
+                            System.out.println("Disconnecting " + client.getUsername() + ": invalid SKIN_UPLOAD length " + len);
+                            throw new IOException("malformed skin length");
                         }
+                        boolean allowed = AntiCheat.checkSkinUpload(client, System.currentTimeMillis());
                         byte[] png = new byte[len];
                         in.readFully(png);
+                        if (!allowed) break;
+                        if (!isValidSkinPng(png)) {
+                            System.out.println("Rejected SKIN_UPLOAD from " + client.getUsername() + ": not a valid 64x64 or 64x32 PNG");
+                            break;
+                        }
                         Server.skins.put(client.getUsername(), png);
                         Broadcaster.broadcastSkin(client.getUsername(), png);
                         break;
@@ -383,5 +390,23 @@ public class ClientHandler {
         String bannedIPs = new String(Files.readAllBytes(path));
         System.out.printf("Is %s banned: %b%n", ip, bannedIPs.contains(ip));
         return bannedIPs.contains(ip);
+    }
+
+    private static boolean isValidSkinPng(byte[] data) {
+        if (data == null || data.length == 0) return false;
+        if (data.length < 8 || (data[0] & 0xFF) != 0x89 || data[1] != 'P' || data[2] != 'N' || data[3] != 'G' || data[4] != 0x0D || data[5] != 0x0A || data[6] != 0x1A || data[7] != 0x0A) {
+            return false;
+        }
+        try {
+            BufferedImage img = ImageIO.read(new ByteArrayInputStream(data));
+            if (img == null) return false;
+            int w = img.getWidth();
+            int h = img.getHeight();
+            return (w == 64 && h == 64) || (w == 64 && h == 32);
+        } catch (IOException e) {
+            return false;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 }
