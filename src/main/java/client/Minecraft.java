@@ -158,6 +158,7 @@ public class Minecraft implements Runnable {
         System.exit(0);
     }
 
+    boolean lastGrabbed = false;
     @Override
     public void run() {
         try {
@@ -201,10 +202,7 @@ public class Minecraft implements Runnable {
             level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
             currentScreen = null;
 
-
             Mouse.setGrabbed(true);
-            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
-            while (Mouse.next()) {}
         }
 
         keepAlive();
@@ -224,6 +222,13 @@ public class Minecraft implements Runnable {
                 timer.advanceTime();
                 for (int i = 0; i < timer.ticks; i++) tick();
                 render(timer.partialTicks);
+
+                boolean shouldGrab = !chat.toggled;
+                if (shouldGrab != lastGrabbed) {
+                    Mouse.setGrabbed(shouldGrab);
+                    if (shouldGrab) while (Mouse.next()) {}
+                    lastGrabbed = shouldGrab;
+                }
 
                 frames++;
                 while (System.currentTimeMillis() >= lastTime + 1000L) {
