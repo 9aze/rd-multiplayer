@@ -100,7 +100,11 @@ public class PlayerRenderer {
             glRotatef( localPlayer.xRotation, 1f, 0f, 0f);
 
             float scale = 0.015F;
-            glScalef(scale, -scale, scale);
+            if (Minecraft.mc.camera.mode == 2) {
+                glScalef(-scale, -scale, scale);
+            } else {
+                glScalef(scale, -scale, scale);
+            }
 
             int tw = fontRenderer.getStringWidth(name);
             int th = fontRenderer.getStringHeight();
