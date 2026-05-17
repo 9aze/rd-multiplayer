@@ -82,15 +82,15 @@ public final class WorldTime {
     };
 
     private static final float[][] AMBIENT_PALETTE = {
-        { 0.00f,  0.04f, 0.04f, 0.09f },
-        { 0.18f,  0.04f, 0.04f, 0.09f },
+        { 0.00f,  0.18f, 0.18f, 0.26f },
+        { 0.18f,  0.18f, 0.18f, 0.26f },
         { 0.25f,  0.45f, 0.40f, 0.40f },
         { 0.35f,  0.62f, 0.62f, 0.68f },
         { 0.50f,  0.65f, 0.65f, 0.70f },
         { 0.65f,  0.60f, 0.58f, 0.60f },
         { 0.75f,  0.45f, 0.38f, 0.35f },
-        { 0.82f,  0.04f, 0.04f, 0.09f },
-        { 1.00f,  0.04f, 0.04f, 0.09f },
+        { 0.82f,  0.18f, 0.18f, 0.26f },
+        { 1.00f,  0.18f, 0.18f, 0.26f },
     };
 
     private static final float[][] DIFFUSE_PALETTE = {

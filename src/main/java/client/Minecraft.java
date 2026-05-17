@@ -97,6 +97,7 @@ public class Minecraft implements Runnable {
     private final FloatBuffer sunPosBuf  = BufferUtils.createFloatBuffer(4);
     private final FloatBuffer ambientBuf = BufferUtils.createFloatBuffer(4);
     private final FloatBuffer diffuseBuf = BufferUtils.createFloatBuffer(4);
+    private final FloatBuffer zeroAmbientBuf = BufferUtils.createFloatBuffer(4);
 
     public int width = 1280;
     public int height = 720;
@@ -108,7 +109,7 @@ public class Minecraft implements Runnable {
     private HitResult hitResult;
 
     private final SkyRenderer skyRenderer = new SkyRenderer();
-    
+
     public static void main(String[] args) throws Exception {
         extractNativesIfJar();
         new Thread(new Minecraft()).start();
@@ -175,6 +176,10 @@ public class Minecraft implements Runnable {
 
         glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, 0);
         glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 0);
+
+        zeroAmbientBuf.put(new float[]{0f, 0f, 0f, 1f}).flip();
+        glLightModel(GL_LIGHT_MODEL_AMBIENT, zeroAmbientBuf);
+
         glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 
         try (InputStream in = FontRenderer.class.getResourceAsStream("/client/fonts/Minecraft.ttf")) {
@@ -435,8 +440,8 @@ public class Minecraft implements Runnable {
 
             glEnable(GL_FOG);
             glFogi(GL_FOG_MODE, GL_LINEAR);
-            glFogf(GL_FOG_START, -10);
-            glFogf(GL_FOG_END, 20);
+            glFogf(GL_FOG_START, 60);
+            glFogf(GL_FOG_END, 120);
             glFog(GL_FOG_COLOR, fogColor);
             glDisable(GL_FOG);
 
