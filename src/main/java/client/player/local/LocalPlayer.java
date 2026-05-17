@@ -180,8 +180,8 @@ public class LocalPlayer {
                 this.motionY += flySpeed;
             }
 
-            if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
-                    || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT) && !Minecraft.mc.chat.toggled) {
+            if ((Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+                    || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT)) && !Minecraft.mc.chat.toggled) {
                 this.motionY -= flySpeed;
             }
 
