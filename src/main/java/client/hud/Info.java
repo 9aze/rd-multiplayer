@@ -23,6 +23,7 @@ public class Info {
 
     private final FontRenderer font;
     private int selected;
+    private boolean hudEnabled = true;
 
     private int terrainTexture = -1;
 
@@ -36,8 +37,13 @@ public class Info {
         else if (wheel > 0) selected = (selected - 1 + BLOCKS.length) % BLOCKS.length;
     }
 
+    private boolean f1WasDown = false;
+
     public void tickKeys() {
         if (Minecraft.mc.chat.toggled) return;
+        boolean f1Down = Keyboard.isKeyDown(Keyboard.KEY_F1);
+        if (f1Down && !f1WasDown) hudEnabled = !hudEnabled;
+        f1WasDown = f1Down;
 
         for (int i = 0; i < KEYS.length; i++) {
             if (Keyboard.isKeyDown(KEYS[i])) {
@@ -52,6 +58,7 @@ public class Info {
     }
 
     public void render(int w, int h) {
+        if(!hudEnabled) return;
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();

@@ -322,6 +322,10 @@ public class Chat {
         add(new ChatMessage(author, message, false));
     }
 
+    public void addMessage(String author, String message, boolean system) {
+        add(new ChatMessage(author, message, system));
+    }
+
     public void addConnectionMessage(String player, int type) {
         add(new ChatMessage(
                 player,
