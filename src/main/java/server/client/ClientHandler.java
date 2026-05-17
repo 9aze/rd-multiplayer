@@ -39,7 +39,7 @@ public class ClientHandler {
             }
 
             String username = in.readUTF().trim();
-            String token = in.readUTF();
+            String token    = in.readUTF();
 
             if (isIPBanned(socket.getInetAddress().getHostAddress())) {
                 reject(out, socket, "You're IP-banned from this server!");
@@ -126,7 +126,8 @@ public class ClientHandler {
                 switch (packetId) {
 
                     case Packets.REQUEST_LEVEL: {
-                        AuthDatabase.SavedPosition saved = Server.authDb.getPosition(client.getUsername());
+                        AuthDatabase.SavedPosition saved =
+                                Server.authDb.getPosition(client.getUsername());
 
                         final double spawnX, spawnY, spawnZ;
                         final float  spawnYaw, spawnPitch;
@@ -146,7 +147,6 @@ public class ClientHandler {
                             spawnYaw = 0f;
                             spawnPitch = 0f;
                         }
-
 
                         long now = System.currentTimeMillis();
                         client.setLastPos(spawnX, spawnY, spawnZ, now);
@@ -217,6 +217,27 @@ public class ClientHandler {
                         }
 
                         client.setLastRotation(yaw, pitch);
+
+                        // void check
+                        if (y < Server.VOID_Y) {
+                            double[] respawn = findSpawnPosition();
+                            final double rx = respawn[0], ry = respawn[1], rz = respawn[2];
+                            client.setLastPos(rx, ry, rz, now);
+                            client.setMoveTokens(Server.MOVE_BURST, now);
+
+                            final Client c = client;
+                            c.send(o -> {
+                                o.writeByte(Packets.SET_POS);
+                                o.writeDouble(rx);
+                                o.writeDouble(ry);
+                                o.writeDouble(rz);
+                            });
+                            c.send(o -> chunkTracker.update(rx, rz, o));
+
+                            System.out.printf("Respawned %s from void (y=%.1f) to (%.1f, %.1f, %.1f)%n",
+                                    client.getUsername(), y, rx, ry, rz);
+                            break;
+                        }
 
                         final double fx = x, fz = z;
                         final Client c = client;

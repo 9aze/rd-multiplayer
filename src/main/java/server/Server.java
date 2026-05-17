@@ -36,6 +36,7 @@ public class Server {
     public static double  PLACE_RATE     = 5.0;    // places / sec
     public static double  BREAK_RATE     = 5.0;    // breaks / sec
     public static int     RENDER_DISTANCE = 8;
+    public static double  VOID_Y         = -32.0;
 
     public static Level level;
     public static AuthDatabase authDb;
@@ -43,7 +44,6 @@ public class Server {
     public static final Set<Client>                   clients       = ConcurrentHashMap.newKeySet();
     public static final ConcurrentHashMap<Client,Long> lastKeepAlive = new ConcurrentHashMap<>();
 
-    /** username → raw PNG bytes of their uploaded skin (if any). */
     public static final ConcurrentHashMap<String, byte[]> skins = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws IOException {
@@ -146,6 +146,7 @@ public class Server {
             PLACE_RATE      = Double.parseDouble (p.getProperty("place_rate",       "5.0"));
             BREAK_RATE      = Double.parseDouble (p.getProperty("break_rate",       "5.0"));
             RENDER_DISTANCE = Integer.parseInt   (p.getProperty("render_distance",  "8"));
+            VOID_Y          = Double.parseDouble (p.getProperty("void_y",           "-32.0"));
 
             System.out.println("Loaded server.properties");
         } catch (Exception e) {
@@ -166,6 +167,7 @@ public class Server {
         d.setProperty("place_rate",      "5.0");
         d.setProperty("break_rate",      "5.0");
         d.setProperty("render_distance", "8");
+        d.setProperty("void_y",          "-32.0");
         try (OutputStream out = Files.newOutputStream(PROPERTIES_PATH)) {
             d.store(out, "Server Properties");
         }
