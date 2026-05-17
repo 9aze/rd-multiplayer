@@ -223,7 +223,9 @@ public class SocketClient implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
             setLoading("Connection error: " + e.getMessage(), Color.RED);
-            Minecraft.mc.disconnect();
+            if(!(Minecraft.mc.currentScreen instanceof LoadingScreen)) {
+                Minecraft.mc.disconnectPending = true;
+            }
         }
     }
 
