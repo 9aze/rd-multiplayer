@@ -191,6 +191,8 @@ public class PlayerRenderer {
 
             int[] pixels = new int[w * h];
             img.getRGB(0, 0, w, h, pixels, 0, w);
+            sanitizeInnerLayer(pixels, w, h);
+
             for (int i = 0; i < pixels.length; i++) {
                 int a = (pixels[i] >> 24) & 0xFF;
                 int r = (pixels[i] >> 16) & 0xFF;
@@ -211,6 +213,38 @@ public class PlayerRenderer {
 
         } catch (Exception e) {
             System.err.println("Skin decode/upload failed: " + e.getMessage());
+        }
+    }
+
+    private static final int[][] INNER_REGIONS_64x64 = {
+            //  x0,  y0,  x1,  y1
+            {  0,   0,  32,  16 },   // head (top + sides + face + back)
+            { 16,  16,  40,  32 },   // torso
+            { 40,  16,  56,  32 },   // right arm
+            {  0,  16,  16,  32 },   // right leg
+            { 32,  48,  48,  64 },   // left arm (1.8+)
+            { 16,  48,  32,  64 },   // left leg (1.8+)
+    };
+
+    // turns transparent skin white
+    private static void sanitizeInnerLayer(int[] pixels, int w, int h) {
+        if (w != 64 || (h != 64 && h != 32)) return;
+        for (int[] r : INNER_REGIONS_64x64) {
+            int x0 = r[0], y0 = r[1], x1 = r[2], y1 = r[3];
+            if (y0 >= h) continue;
+            int yMax = Math.min(y1, h);
+            for (int y = y0; y < yMax; y++) {
+                for (int x = x0; x < x1; x++) {
+                    int idx = y * w + x;
+                    int p = pixels[idx];
+                    int a = (p >>> 24) & 0xFF;
+                    if (a < 128) {
+                        pixels[idx] = 0xFFFFFFFF;
+                    } else if (a < 255) {
+                        pixels[idx] = 0xFF000000 | (p & 0x00FFFFFF);
+                    }
+                }
+            }
         }
     }
 
