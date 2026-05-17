@@ -506,6 +506,7 @@ public class Minecraft implements Runnable {
             levelRenderer.render(0);
             glEnable(GL_FOG);
             levelRenderer.render(1);
+            levelRenderer.renderTntOverlay();
 
             glDisable(GL_COLOR_MATERIAL);
             glDisable(GL_LIGHT0);
