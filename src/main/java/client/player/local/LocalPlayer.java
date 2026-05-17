@@ -84,6 +84,13 @@ public class LocalPlayer {
         this.xRotation = Math.min(90.0F, this.xRotation);
     }
 
+    private boolean chunksAroundLoaded() {
+        if (this.boundingBox == null) return false;
+        return level.hasChunksInArea(
+                this.boundingBox.minX - 1, this.boundingBox.minZ - 1,
+                this.boundingBox.maxX + 1, this.boundingBox.maxZ + 1);
+    }
+
     public void tick() throws IOException {
         synchronized (posLock) {
             if (hasPendingReset) {
@@ -101,6 +108,17 @@ public class LocalPlayer {
                 this.boundingBox = new AABB(resetX - width, minY, resetZ - width, resetX + width, minY + (2.0F * this.height), resetZ + width);
                 this.hasPendingReset = false;
             }
+        }
+
+        if (!chunksAroundLoaded()) {
+            while (Keyboard.next()) { /* drop events */ }
+            this.motionX = 0.0D;
+            this.motionY = 0.0D;
+            this.motionZ = 0.0D;
+            this.prevX = this.x;
+            this.prevY = this.y;
+            this.prevZ = this.z;
+            return;
         }
 
         this.prevX = this.x;

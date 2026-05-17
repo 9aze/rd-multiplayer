@@ -179,6 +179,23 @@ public class Level {
 
     public boolean hasAnyChunk() { return !chunks.isEmpty(); }
 
+    public boolean hasChunk(int cx, int cz) {
+        return chunks.containsKey(chunkKey(cx, cz));
+    }
+
+    public boolean hasChunksInArea(double minX, double minZ, double maxX, double maxZ) {
+        int cx0 = Math.floorDiv((int) Math.floor(minX), CHUNK_SIZE);
+        int cx1 = Math.floorDiv((int) Math.floor(maxX), CHUNK_SIZE);
+        int cz0 = Math.floorDiv((int) Math.floor(minZ), CHUNK_SIZE);
+        int cz1 = Math.floorDiv((int) Math.floor(maxZ), CHUNK_SIZE);
+        for (int cx = cx0; cx <= cx1; cx++) {
+            for (int cz = cz0; cz <= cz1; cz++) {
+                if (!chunks.containsKey(chunkKey(cx, cz))) return false;
+            }
+        }
+        return true;
+    }
+
     public void forEachLoadedChunk(java.util.function.BiConsumer<Integer, Integer> action) {
         for (long key : chunks.keySet()) {
             int cx = (int)(key >> 32);
