@@ -1,15 +1,12 @@
 package server;
 
 import com.google.gson.*;
-import global.Packets;
-import netscape.javascript.JSObject;
 import server.auth.AuthDatabase;
 import server.client.Client;
 import server.client.ClientHandler;
 import server.client.TimeoutHandler;
 import server.commands.*;
 import server.level.Level;
-import server.net.Broadcaster;
 
 import java.util.*;
 import java.io.*;
