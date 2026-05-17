@@ -17,6 +17,7 @@ import static org.lwjgl.opengl.GL11.*;
 public class LevelRenderer implements LevelListener {
     private static final int CHUNK_SIZE = Level.CHUNK_SIZE;
     private static final int RENDER_CHUNK_HEIGHT = 16;
+    private final Set<Long> tntPositions = ConcurrentHashMap.newKeySet();
 
     private final Tessellator tessellator;
     private final Level level;
@@ -35,19 +36,34 @@ public class LevelRenderer implements LevelListener {
     }
 
     private static long rcKey(int cx, int sliceY, int cz) {
-        return ((long)(cx & 0xFFFFL) << 32)
-                | ((long)(sliceY & 0xFFFFL) << 16)
+        return ((long) (cx & 0xFFFFL) << 32)
+                | ((long) (sliceY & 0xFFFFL) << 16)
                 | (cz & 0xFFFFL);
     }
-    private static int rcCX(long key) { return (short)((key >> 32) & 0xFFFFL); }
-    private static int rcSY(long key) { return (int)((key >> 16) & 0xFFFFL); }
-    private static int rcCZ(long key) { return (short)(key & 0xFFFFL); }
+
+    private static int rcCX(long key) {
+        return (short) ((key >> 32) & 0xFFFFL);
+    }
+
+    private static int rcSY(long key) {
+        return (int) ((key >> 16) & 0xFFFFL);
+    }
+
+    private static int rcCZ(long key) {
+        return (short) (key & 0xFFFFL);
+    }
 
     private static long colKey(int cx, int cz) {
         return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
     }
-    private static int colCX(long key) { return (int)(key >> 32); }
-    private static int colCZ(long key) { return (int) key; }
+
+    private static int colCX(long key) {
+        return (int) (key >> 32);
+    }
+
+    private static int colCZ(long key) {
+        return (int) key;
+    }
 
     private int sliceCount() {
         return Math.max(1, (level.depth + RENDER_CHUNK_HEIGHT - 1) / RENDER_CHUNK_HEIGHT);
@@ -71,6 +87,12 @@ public class LevelRenderer implements LevelListener {
     @Override
     public void tileChanged(int x, int y, int z) {
         setDirty(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
+
+        if ((level.getRawBlock(x, y, z) & 0xFF) == BlockRegistry.TNT.id) {
+            tntPositions.add(((long) x << 40) | ((long) y << 20) | z);
+        } else {
+            tntPositions.remove(((long) x << 40) | ((long) y << 20) | z);
+        }
     }
 
     @Override
@@ -105,9 +127,16 @@ public class LevelRenderer implements LevelListener {
                 int maxZ = minZ + CHUNK_SIZE;
                 rc = new Chunk(level, minX, minY, minZ, maxX, maxY, maxZ);
                 renderChunks.put(key, rc);
+
+                for (int x = minX; x < maxX; x++)
+                    for (int y = minY; y < maxY; y++)
+                        for (int z = minZ; z < maxZ; z++)
+                            if ((level.getRawBlock(x, y, z) & 0xFF) == BlockRegistry.TNT.id)
+                                tntPositions.add(((long)x << 40) | ((long)y << 20) | z);
             }
             rc.setDirty();
         }
+
     }
 
     public void setDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -155,9 +184,9 @@ public class LevelRenderer implements LevelListener {
         float radius = 3.0F;
         AABB bb = localPlayer.boundingBox.grow(radius, radius, radius);
 
-        int x0 = (int) bb.minX, x1 = (int)(bb.maxX + 1);
-        int y0 = (int) bb.minY, y1 = (int)(bb.maxY + 1);
-        int z0 = (int) bb.minZ, z1 = (int)(bb.maxZ + 1);
+        int x0 = (int) bb.minX, x1 = (int) (bb.maxX + 1);
+        int y0 = (int) bb.minY, y1 = (int) (bb.maxY + 1);
+        int z0 = (int) bb.minZ, z1 = (int) (bb.maxZ + 1);
 
         glInitNames();
         for (int x = x0; x < x1; x++) {
@@ -214,5 +243,56 @@ public class LevelRenderer implements LevelListener {
 
     public void renderNameTags(PlayerManager playerManager, LocalPlayer localPlayer, FontRenderer fontRenderer) {
         playerRenderer.renderNameTags(playerManager, localPlayer, fontRenderer);
+    }
+
+    public void renderTntOverlay() {
+        if (tntPositions.isEmpty()) return;
+        float alpha = (float)(Math.sin(System.currentTimeMillis() / 150.0) * 0.5 + 0.5) * 0.8f;
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_LIGHTING);
+        glColor4f(1f, 1f, 1f, alpha);
+
+        Frustum frustum = Frustum.getFrustum();
+
+        for (long key : tntPositions) {
+            int x = (int)(key >> 40);
+            int y = (int)((key >> 20) & 0xFFFFF);
+            int z = (int)(key & 0xFFFFF);
+
+            if (!frustum.cubeInFrustum(x, y, z, x + 1, y + 1, z + 1)) continue;
+
+            float x0 = x, x1 = x + 1;
+            float y0 = y, y1 = y + 1;
+            float z0 = z, z1 = z + 1;
+
+            glBegin(GL_QUADS);
+            if (!level.isSolidTile(x, y - 1, z)) {
+                glVertex3f(x0,y0,z1); glVertex3f(x0,y0,z0); glVertex3f(x1,y0,z0); glVertex3f(x1,y0,z1);
+            }
+            if (!level.isSolidTile(x, y + 1, z)) {
+                glVertex3f(x1,y1,z1); glVertex3f(x1,y1,z0); glVertex3f(x0,y1,z0); glVertex3f(x0,y1,z1);
+            }
+            if (!level.isSolidTile(x, y, z - 1)) {
+                glVertex3f(x0,y1,z0); glVertex3f(x1,y1,z0); glVertex3f(x1,y0,z0); glVertex3f(x0,y0,z0);
+            }
+            if (!level.isSolidTile(x, y, z + 1)) {
+                glVertex3f(x0,y1,z1); glVertex3f(x0,y0,z1); glVertex3f(x1,y0,z1); glVertex3f(x1,y1,z1);
+            }
+            if (!level.isSolidTile(x - 1, y, z)) {
+                glVertex3f(x0,y1,z1); glVertex3f(x0,y1,z0); glVertex3f(x0,y0,z0); glVertex3f(x0,y0,z1);
+            }
+            if (!level.isSolidTile(x + 1, y, z)) {
+                glVertex3f(x1,y0,z1); glVertex3f(x1,y0,z0); glVertex3f(x1,y1,z0); glVertex3f(x1,y1,z1);
+            }
+            glEnd();
+        }
+
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_LIGHTING);
+        glDisable(GL_BLEND);
+        glColor4f(1f, 1f, 1f, 1f);
     }
 }

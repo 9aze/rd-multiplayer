@@ -66,7 +66,7 @@ public class LoadingScreen extends Screen {
         while (Mouse.next()) {
             if (Mouse.getEventButton() == 0 && Mouse.getEventButtonState()) {
                 if (backBtn.contains(mx, myFlipped)) {
-                    Minecraft.mc.disconnect();
+                    Minecraft.mc.applyDisconnect();
                     return;
                 }
             }
@@ -104,14 +104,6 @@ public class LoadingScreen extends Screen {
         glMatrixMode(GL_PROJECTION);
         glPopMatrix();
         glMatrixMode(GL_MODELVIEW);
-    }
-
-    public void setLoadingText(String loadingText) {
-        this.loadingText = loadingText;
-    }
-
-    public void setLoadingColor(Color loadingColor) {
-        this.loadingColor = loadingColor;
     }
 
     @Override

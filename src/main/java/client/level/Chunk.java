@@ -20,8 +20,12 @@ public class Chunk {
     private final Level level;
 
     public AABB boundingBox;
-    private final int minX, minY, minZ;
-    private final int maxX, maxY, maxZ;
+    final int minX;
+    final int minY;
+    final int minZ;
+    final int maxX;
+    final int maxY;
+    final int maxZ;
 
     private final int lists;
     private boolean dirty = true;

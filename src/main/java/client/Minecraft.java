@@ -80,6 +80,7 @@ public class Minecraft implements Runnable {
     public int pendingDepth = -1;
     public byte[] pendingBlocks = null;
     public volatile boolean levelUpdatePending = false;
+    public volatile boolean disconnectPending = false;
 
     private FontRenderer font;
     private Font minecraftFont;
@@ -157,6 +158,7 @@ public class Minecraft implements Runnable {
     }
 
     public void disconnect() {
+        disconnectPending = true;
         if (socket != null) {
             socket.disconnect();
             socket = null;
@@ -165,7 +167,10 @@ public class Minecraft implements Runnable {
             socketThread.interrupt();
             socketThread = null;
         }
+    }
 
+    public void applyDisconnect() {
+        disconnectPending = false;
         level = null;
         levelRenderer = null;
         localPlayer = null;
@@ -173,8 +178,7 @@ public class Minecraft implements Runnable {
         playerManager = null;
         levelReady = false;
         levelUpdatePending = false;
-
-        glClearColor(0, 0, 0, 1);
+        spawnReceived = false;
         Mouse.setGrabbed(false);
         currentScreen = new MenuScreen();
     }
@@ -281,8 +285,10 @@ public class Minecraft implements Runnable {
 
         try {
             while (!Display.isCloseRequested()) {
-                if (socket == null || !socket.isConnected()) {
-                    disconnect();
+                if (disconnectPending) {
+                    if(!(Minecraft.mc.currentScreen instanceof LoadingScreen)) {
+                        Minecraft.mc.applyDisconnect();
+                    }
                     runMenuLoop();
                     return;
                 }
@@ -369,7 +375,7 @@ public class Minecraft implements Runnable {
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
         }
-        if (localPlayer != null) localPlayer.tick();
+        if (localPlayer != null && socket != null && socket.isConnected()) localPlayer.tick();
     }
 
     private void toggleFullscreen() {
@@ -436,7 +442,7 @@ public class Minecraft implements Runnable {
                 && level != null && levelRenderer != null && localPlayer != null
                 && level.hasAnyChunk();
 
-        if (worldReady && currentScreen == null) {
+        if (worldReady && currentScreen == null && localPlayer != null && levelRenderer != null) {
             pick(pt);
 
             while (Mouse.next()) {
@@ -500,6 +506,7 @@ public class Minecraft implements Runnable {
             levelRenderer.render(0);
             glEnable(GL_FOG);
             levelRenderer.render(1);
+            levelRenderer.renderTntOverlay();
 
             glDisable(GL_COLOR_MATERIAL);
             glDisable(GL_LIGHT0);
