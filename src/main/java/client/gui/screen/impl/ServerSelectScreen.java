@@ -290,7 +290,7 @@ public class ServerSelectScreen extends Screen {
         glVertex2f(f.x, f.y); glVertex2f(f.x + f.w, f.y);
         glVertex2f(f.x + f.w, f.y + f.h); glVertex2f(f.x, f.y + f.h);
         glEnd();
-        if (f.focused && selected && !f.value.isEmpty()) {
+        if (f.focused && selected && f.value.length() > 0) {
             int lh = font.getStringHeight();
             int selX = f.x + 6;
             int selW = font.getStringWidth(f.value.toString());
