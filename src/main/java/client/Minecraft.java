@@ -21,10 +21,17 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Properties;
@@ -248,6 +255,8 @@ public class Minecraft implements Runnable {
         currentScreen = null;
     }
 
+    boolean f2WasDown = false;
+
     private void tick() throws IOException {
         info.tickKeys();
         info.tickScroll();
@@ -255,6 +264,10 @@ public class Minecraft implements Runnable {
         if (Keyboard.isKeyDown(Keyboard.KEY_F11)) {
             toggleFullscreen();
         }
+
+        boolean f2Down = Keyboard.isKeyDown(Keyboard.KEY_F2);
+        if (f2Down && !f2WasDown) screenshot();
+        f2WasDown = f2Down;
 
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
@@ -382,6 +395,45 @@ public class Minecraft implements Runnable {
         }
 
         Display.update();
+    }
+
+    //TODO: prob put this somewhere else
+    private void screenshot() {
+        try {
+            ByteBuffer buf = BufferUtils.createByteBuffer(width * height * 4);
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int r = buf.get() & 0xFF;
+                    int g = buf.get() & 0xFF;
+                    int b = buf.get() & 0xFF;
+                    int a = buf.get() & 0xFF;
+                    img.setRGB(x, height - 1 - y, (a << 24) | (r << 16) | (g << 8) | b);
+                }
+            }
+            new File("screenshots").mkdirs();
+            String name = new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new java.util.Date());
+            File out = new File("screenshots/" + name + ".png");
+            ImageIO.write(img, "PNG", out);
+
+            Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
+            cb.setContents(new Transferable() {
+                public DataFlavor[] getTransferDataFlavors() {
+                    return new DataFlavor[]{DataFlavor.imageFlavor};
+                }
+                public boolean isDataFlavorSupported(DataFlavor f) {
+                    return f.equals(DataFlavor.imageFlavor);
+                }
+                public Object getTransferData(DataFlavor f) {
+                    return img;
+                }
+            }, null);
+
+            chat.addMessage("Screenshot", " saved and copied!", true);
+        } catch (Exception e) {
+            System.err.println("Screenshot failed: " + e.getMessage());
+        }
     }
 
     private void keepAlive() {
