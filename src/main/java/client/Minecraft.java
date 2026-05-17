@@ -183,6 +183,7 @@ public class Minecraft implements Runnable {
             localPlayer = new LocalPlayer(level);
             camera = new Camera(this);
             level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
+            currentScreen = null;
         }
 
         keepAlive();

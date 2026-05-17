@@ -1,6 +1,7 @@
 package server;
 
 import global.Packets;
+import server.auth.AuthDatabase;
 import server.client.Client;
 import server.client.ClientHandler;
 import server.client.TimeoutHandler;
@@ -22,6 +23,7 @@ public class Server {
 
     private static final Path PROPERTIES_PATH = Paths.get("server.properties");
     public static final Path BANNED_PATH = Paths.get("banned_ips.json");
+    private static final Path AUTH_DB_PATH  = Paths.get("auth.sqlite");
 
     public static int PORT         = 9090;
     public static int PLAYER_LIMIT = 50;
@@ -36,6 +38,7 @@ public class Server {
     public static int     RENDER_DISTANCE = 8;
 
     public static Level level;
+    public static AuthDatabase authDb;
 
     public static final Set<Client>                   clients       = ConcurrentHashMap.newKeySet();
     public static final ConcurrentHashMap<Client,Long> lastKeepAlive = new ConcurrentHashMap<>();
@@ -45,6 +48,9 @@ public class Server {
 
     public static void main(String[] args) throws IOException {
         loadProperties();
+
+        authDb = new AuthDatabase(AUTH_DB_PATH.toString());
+        System.out.println("Auth database opened at " + AUTH_DB_PATH);
 
         level = new Level(64);
 

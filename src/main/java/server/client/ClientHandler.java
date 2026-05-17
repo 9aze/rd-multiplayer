@@ -19,6 +19,7 @@ public class ClientHandler {
     private static final int MAX_MESSAGE_LENGTH  = 256;
     private static final int MAX_BLOCK_ID = 9;
     private static final int MAX_SKIN_BYTES = 64 * 1024;
+    private static final int TOKEN_LENGTH = 64;
 
     public static void handle(Socket socket) {
         DataInputStream in = null;
@@ -37,6 +38,7 @@ public class ClientHandler {
             }
 
             String username = in.readUTF().trim();
+            String token = in.readUTF();
 
             if (isIPBanned(socket.getInetAddress().getHostAddress())) {
                 reject(out, socket, "You're IP-banned from this server!");
@@ -46,6 +48,21 @@ public class ClientHandler {
             if (!isValidUsername(username)) {
                 reject(out, socket, "Illegal username! You can only use 16 letters, numbers and underscores!");
                 return;
+            }
+
+            // token authentication
+            String existing = Server.authDb.getToken(username);
+            String newTokenToSend = null;
+
+            if (existing == null) {
+                newTokenToSend = Server.authDb.registerNewToken(username);
+                System.out.println("Registered new account: " + username);
+            } else {
+                if (token == null || token.length() != TOKEN_LENGTH || !Server.authDb.verifyToken(username, token)) {
+                    System.out.println("Rejected " + username + ": invalid/missing token");
+                    reject(out, socket, "That username is already registered on this server. Please pick another name.");
+                    return;
+                }
             }
 
             boolean taken = Server.clients.stream()
@@ -76,6 +93,12 @@ public class ClientHandler {
 
             out.writeByte(Packets.AUTH_SUCCESS);
             out.flush();
+
+            if (newTokenToSend != null) {
+                out.writeByte(Packets.AUTH_TOKEN);
+                out.writeUTF(newTokenToSend);
+                out.flush();
+            }
 
             client = new Client(username, socket, out);
             Server.clients.add(client);

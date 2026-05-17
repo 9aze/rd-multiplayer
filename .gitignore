@@ -130,4 +130,3 @@ src/test/
 run
 server/level.dat
 bin/*
-git.properties

@@ -17,6 +17,8 @@ public class SocketClient implements Runnable {
     private final String host;
     private final int port;
     private final String username;
+    /** Identifier used in the .auth file ("host:port"). */
+    private final String serverId;
     private Socket socket;
     private static DataOutputStream out;
     private DataInputStream in;
@@ -30,6 +32,7 @@ public class SocketClient implements Runnable {
         this.host = host;
         this.port = port;
         this.username = username;
+        this.serverId = host + ":" + port;
     }
 
     private void setLoading(String text, Color color) {
@@ -51,8 +54,13 @@ public class SocketClient implements Runnable {
 
             setLoading("Creating network streams...", Color.WHITE);
 
+            // lookup stored tokens and authenticate
+            String storedToken = AuthStore.getToken(serverId, username);
+            if (storedToken == null) storedToken = "";
+
             out.writeByte(Packets.AUTH_REQUEST);
             out.writeUTF(username);
+            out.writeUTF(storedToken);
             out.flush();
 
             setLoading("Sending authentication request...", Color.WHITE);
@@ -86,6 +94,14 @@ public class SocketClient implements Runnable {
                 byte packetId = in.readByte();
 
                 switch (packetId) {
+
+                    case Packets.AUTH_TOKEN: {
+                        String newToken = in.readUTF();
+                        AuthStore.saveToken(serverId, username, newToken);
+                        System.out.println("Saved new auth token for " + username
+                                + " on " + serverId);
+                        break;
+                    }
 
                     case Packets.CHUNK_DATA: {
                         int cx = in.readInt(); int cz = in.readInt(); int depth = in.readInt(); int len = in.readInt();

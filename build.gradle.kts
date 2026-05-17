@@ -15,6 +15,7 @@ natives.isTransitive = true
 dependencies {
     implementation(group = "org.lwjgl.lwjgl", name = "lwjgl", version = "2.9.3")
     implementation(group = "org.lwjgl.lwjgl", name = "lwjgl_util", version = "2.9.3")
+    implementation(group = "org.xerial", name = "sqlite-jdbc", version = "3.53.1.0")
     natives(group = "org.lwjgl.lwjgl", name = "lwjgl-platform", version = "2.9.3", classifier = "natives-windows")
     natives(group = "org.lwjgl.lwjgl", name = "lwjgl-platform", version = "2.9.3", classifier = "natives-linux")
     natives(group = "org.lwjgl.lwjgl", name = "lwjgl-platform", version = "2.9.3", classifier = "natives-osx")
