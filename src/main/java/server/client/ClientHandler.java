@@ -28,6 +28,7 @@ public class ClientHandler {
         Client client = null;
 
         ChunkTracker chunkTracker = new ChunkTracker();
+        boolean spawned = false;
 
         try {
             in  = new DataInputStream(socket.getInputStream());
@@ -56,11 +57,10 @@ public class ClientHandler {
 
             if (existing == null) {
                 newTokenToSend = Server.authDb.registerNewToken(username);
-                if (Server.LOGS) System.out.println("Registered new account: " + username);
+                System.out.println("Registered new account: " + username);
             } else {
-                if (token == null || token.length() != TOKEN_LENGTH
-                        || !Server.authDb.verifyToken(username, token)) {
-                    if (Server.LOGS) System.out.println("Rejected " + username + ": invalid/missing token");
+                if (token == null || token.length() != TOKEN_LENGTH || !Server.authDb.verifyToken(username, token)) {
+                    System.out.println("Rejected " + username + ": invalid/missing token");
                     reject(out, socket,
                            "That username is already registered on this server. Please pick another name.");
                     return;
@@ -77,17 +77,17 @@ public class ClientHandler {
                     .count();
 
             if (connectionsFromIp >= Server.MAX_PER_IP) {
-                if (Server.LOGS) System.out.println("Rejected " + username + ": Too many connections from IP " + ip);
+                System.out.println("Rejected " + username + ": Too many connections from IP " + ip);
                 reject(out, socket, "Too many connections from your IP!");
                 return;
             }
 
             if (taken || Server.clients.size() >= Server.PLAYER_LIMIT) {
                 if (taken) {
-                    if (Server.LOGS) System.out.println("Rejected " + username + ": Username taken.");
+                    System.out.println("Rejected " + username + ": Username taken.");
                     reject(out, socket, "Username is already taken!");
                 } else {
-                    if (Server.LOGS) System.out.println("Rejected " + username + ": Player limit reached.");
+                    System.out.println("Rejected " + username + ": Player limit reached.");
                     reject(out, socket, "This server is full!");
                 }
                 return;
@@ -109,8 +109,6 @@ public class ClientHandler {
             System.out.println("Client authenticated: " + username);
             Broadcaster.broadcastConnection(0, client);
 
-            server.net.TimeBroadcaster.sendTo(client);
-
             for (java.util.Map.Entry<String, byte[]> e : Server.skins.entrySet()) {
                 final String uname = e.getKey();
                 final byte[] png   = e.getValue();
@@ -128,6 +126,11 @@ public class ClientHandler {
                 switch (packetId) {
 
                     case Packets.REQUEST_LEVEL: {
+                        if (spawned) {
+                            System.out.println("Ignoring duplicate REQUEST_LEVEL from " + client.getUsername());
+                            break;
+                        }
+
                         AuthDatabase.SavedPosition saved =
                                 Server.authDb.getPosition(client.getUsername());
 
@@ -139,7 +142,7 @@ public class ClientHandler {
                             spawnZ = saved.z;
                             spawnYaw = saved.yaw;
                             spawnPitch = saved.pitch;
-                            if (Server.LOGS) System.out.printf("Restored %s at (%.1f, %.1f, %.1f)%n",
+                            System.out.printf("Restored %s at (%.1f, %.1f, %.1f)%n",
                                     client.getUsername(), spawnX, spawnY, spawnZ);
                         } else {
                             double[] spawnPos = findSpawnPosition();
@@ -163,11 +166,13 @@ public class ClientHandler {
                             o.writeDouble(spawnZ);
                         });
                         c.send(o -> chunkTracker.update(spawnX, spawnZ, o));
+                        spawned = true;
                         break;
                     }
 
                     case Packets.BLOCK_BREAK: {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
+                        if (!spawned) break;
                         if (!AntiCheat.checkBlock(client, x, y, z, false, System.currentTimeMillis())) break;
                         Server.level.setTile(x, y, z, 0);
                         Broadcaster.broadcastBlock(Packets.BLOCK_BREAK, x, y, z, 0);
@@ -177,10 +182,10 @@ public class ClientHandler {
                     case Packets.BLOCK_PLACE: {
                         int x = in.readInt(), y = in.readInt(), z = in.readInt();
                         int blockId = in.readByte() & 0xFF;
+                        if (!spawned) break;
 
                         if (blockId <= 0 || blockId > MAX_BLOCK_ID) {
-                            if (Server.LOGS) System.out.println("Rejected BLOCK_PLACE from " + client.getUsername()
-                                    + ": invalid blockId " + blockId);
+                            System.out.println("Rejected BLOCK_PLACE from " + client.getUsername() + ": invalid blockId " + blockId);
                             break;
                         }
 
@@ -196,12 +201,13 @@ public class ClientHandler {
                     }
 
                     case Packets.POS: {
-                        double x    = in.readDouble();
-                        double y    = in.readDouble();
-                        double z    = in.readDouble();
-                        float  yaw   = in.readFloat();
-                        float  pitch = in.readFloat();
-                        int    ping = in.readInt();
+                        double x = in.readDouble();
+                        double y = in.readDouble();
+                        double z = in.readDouble();
+                        float yaw = in.readFloat();
+                        float pitch = in.readFloat();
+                        int ping = in.readInt();
+                        if (!spawned) break;
 
                         long now = System.currentTimeMillis();
                         if (!AntiCheat.checkMovement(client, x, y, z, now)) {
@@ -236,7 +242,7 @@ public class ClientHandler {
                             });
                             c.send(o -> chunkTracker.update(rx, rz, o));
 
-                            if (Server.LOGS) System.out.printf("Respawned %s from void (y=%.1f) to (%.1f, %.1f, %.1f)%n",
+                            System.out.printf("Respawned %s from void (y=%.1f) to (%.1f, %.1f, %.1f)%n",
                                     client.getUsername(), y, rx, ry, rz);
                             break;
                         }
@@ -277,7 +283,7 @@ public class ClientHandler {
                     case Packets.SKIN_UPLOAD: {
                         int len = in.readInt();
                         if (len < 0 || len > MAX_SKIN_BYTES) {
-                            if (Server.LOGS) System.out.println("Rejected SKIN_UPLOAD from "
+                            System.out.println("Rejected SKIN_UPLOAD from "
                                     + client.getUsername() + ": invalid length " + len);
                             if (len > 0 && len <= 10 * 1024 * 1024) in.skipBytes(len);
                             break;
@@ -290,7 +296,7 @@ public class ClientHandler {
                     }
 
                     default:
-                        if (Server.LOGS) System.err.println("Unknown packet id: " + packetId);
+                        System.err.println("Unknown packet id: " + packetId);
                         break;
                 }
             }
@@ -375,7 +381,7 @@ public class ClientHandler {
     private static boolean isIPBanned(String ip) throws IOException {
         Path path = Server.BANNED_PATH;
         String bannedIPs = new String(Files.readAllBytes(path));
-        if (Server.LOGS) System.out.printf("Is %s banned: %b%n", ip, bannedIPs.contains(ip));
+        System.out.printf("Is %s banned: %b%n", ip, bannedIPs.contains(ip));
         return bannedIPs.contains(ip);
     }
 }
