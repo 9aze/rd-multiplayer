@@ -91,6 +91,14 @@ public class Minecraft implements Runnable {
     private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult;
 
+    // Day/night cycle: when the sky brightness drifts past this much from
+    // the value the chunk meshes were last baked at, rebuild them so the
+    // per-face vertex colors stay in sync with the cycle. Smaller = smoother
+    // dimming, but more rebuilds. With a 20-minute cycle, 0.02 fires roughly
+    // every 6-10 seconds, which is cheap and visually seamless.
+    private static final float SKY_REBAKE_THRESHOLD = 0.02f;
+    private float lastBakedSkyBrightness = Float.NaN;
+
     public static void main(String[] args) throws IOException {
         new Thread(new Minecraft()).start();
     }
@@ -256,6 +264,14 @@ public class Minecraft implements Runnable {
             toggleFullscreen();
         }
 
+        if (levelRenderer != null && client.level.WorldTime.initialized) {
+            float now = client.level.WorldTime.skyBrightness();
+            if (Float.isNaN(lastBakedSkyBrightness) || Math.abs(now - lastBakedSkyBrightness) >= SKY_REBAKE_THRESHOLD) {
+                levelRenderer.rebuildAll();
+                lastBakedSkyBrightness = now;
+            }
+        }
+
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
@@ -313,8 +329,16 @@ public class Minecraft implements Runnable {
     }
 
     private void render(float pt) throws IOException {
-        glClearColor(0, 0, 0, 1);
+        float[] skyRgb = new float[3];
+        float[] fogRgb = new float[3];
+        client.level.WorldTime.currentSkyColor(skyRgb);
+        client.level.WorldTime.currentFogColor(fogRgb);
+
+        glClearColor(skyRgb[0], skyRgb[1], skyRgb[2], 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        fogColor.clear();
+        fogColor.put(fogRgb[0]).put(fogRgb[1]).put(fogRgb[2]).put(1f).flip();
 
         boolean worldReady = (levelReady || !levelUpdatePending)
                 && level != null && levelRenderer != null && localPlayer != null

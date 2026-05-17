@@ -109,6 +109,8 @@ public class ClientHandler {
             System.out.println("Client authenticated: " + username);
             Broadcaster.broadcastConnection(0, client);
 
+            server.net.TimeBroadcaster.sendTo(client);
+
             for (java.util.Map.Entry<String, byte[]> e : Server.skins.entrySet()) {
                 final String uname = e.getKey();
                 final byte[] png   = e.getValue();

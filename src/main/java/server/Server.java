@@ -62,6 +62,7 @@ public class Server {
         ServerSocket serverSocket = new ServerSocket(PORT);
         System.out.println("Server started on port " + PORT);
         TimeoutHandler.start();
+        server.net.TimeBroadcaster.start();
 
         Scanner scanner = new Scanner(System.in);
         Thread t = new Thread(() -> {

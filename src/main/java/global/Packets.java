@@ -1,5 +1,4 @@
 package global;
-
 public final class Packets {
     public static final byte AUTH_REQUEST  = 1;
     public static final byte AUTH_SUCCESS  = 2;
@@ -18,4 +17,5 @@ public final class Packets {
     public static final byte SKIN_UPLOAD   = 15;
     public static final byte SKIN_DATA     = 16;
     public static final byte AUTH_TOKEN    = 17;
+    public static final byte TIME_OF_DAY   = 18;
 }

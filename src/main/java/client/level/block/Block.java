@@ -101,9 +101,11 @@ public abstract class Block {
 
         if (level.isSolidTile(x, y, z)) return;
 
-        float b = level.getBrightness(x, y, z) * shade;
+        float rawB = level.getBrightness(x, y, z);
+        boolean lit = rawB >= client.level.WorldTime.currentLit() - 1e-4f;
+        float b = rawB * shade;
 
-        if (!(layer == 1 ^ b == shade)) return;
+        if (lit == (layer == 1)) return;
 
         t.color(b, b, b);
 

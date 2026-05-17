@@ -1,7 +1,6 @@
 package client.level;
 
 import client.phys.AABB;
-
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -122,8 +121,8 @@ public class Level {
     }
 
     public float getBrightness(int x, int y, int z) {
-        float dark  = 0.8F;
-        float light = 1.0F;
+        float dark  = WorldTime.currentShadow();
+        float light = WorldTime.currentLit();
         if (y < 0 || y >= depth) return light;
         int cx = Math.floorDiv(x, CHUNK_SIZE);
         int cz = Math.floorDiv(z, CHUNK_SIZE);
