@@ -14,11 +14,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class ChunkTracker {
-
-    public static final int RENDER_DISTANCE = Server.RENDER_DISTANCE;
-    /** Vertical render distance, in cubic chunks (each 16 tall). */
+    public static final int MAX_RENDER_DISTANCE = Server.RENDER_DISTANCE;
     public static final int VERTICAL_RENDER_DISTANCE = Server.VERTICAL_RENDER_DISTANCE;
     private static final int CHUNK_SIZE = LevelChunk.CHUNK_SIZE;
+
+    private int renderDistance = Server.RENDER_DISTANCE;
+
+    public void setRenderDistance(int chunks) {
+        if (chunks < 2) chunks = 2;
+        if (chunks > MAX_RENDER_DISTANCE) chunks = MAX_RENDER_DISTANCE;
+        this.renderDistance = chunks;
+    }
 
     private static final ConcurrentHashMap<Long, AtomicInteger> refCounts =
             new ConcurrentHashMap<>();
@@ -46,12 +52,12 @@ public class ChunkTracker {
         int playerCY = Math.floorDiv((int) Math.floor(worldY), CHUNK_SIZE);
         int playerCZ = Math.floorDiv((int) Math.floor(worldZ), CHUNK_SIZE);
 
-        int minCX = playerCX - RENDER_DISTANCE;
-        int maxCX = playerCX + RENDER_DISTANCE;
+        int minCX = playerCX - renderDistance;
+        int maxCX = playerCX + renderDistance;
         int minCY = playerCY - VERTICAL_RENDER_DISTANCE;
         int maxCY = playerCY + VERTICAL_RENDER_DISTANCE;
-        int minCZ = playerCZ - RENDER_DISTANCE;
-        int maxCZ = playerCZ + RENDER_DISTANCE;
+        int minCZ = playerCZ - renderDistance;
+        int maxCZ = playerCZ + renderDistance;
 
         // unload chunks now out of range.
         Set<Long> toRemove = new HashSet<>();
@@ -100,7 +106,7 @@ public class ChunkTracker {
         out.writeInt(cx);
         out.writeInt(cy);
         out.writeInt(cz);
-        out.write(data); // exactly 4096 bytes (16x16x16)
+        out.write(data); // 4096 bytes (16x16x16)
     }
 
     private static long pack(int cx, int cy, int cz) {

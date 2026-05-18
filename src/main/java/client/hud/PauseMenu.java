@@ -3,6 +3,7 @@ package client.hud;
 import client.FontRenderer;
 import client.Minecraft;
 import client.gui.screen.components.ButtonComponent;
+import client.gui.screen.impl.OptionsScreen;
 import org.lwjgl.input.Mouse;
 
 import java.awt.*;
@@ -83,7 +84,11 @@ public class PauseMenu {
             }
 
             if (optionsBtn.contains(mx, my)) {
-                // TODO: open options menu
+                visible = false;
+                Mouse.setGrabbed(false);
+                Minecraft.mc.setScreen(OptionsScreen.forInGame());
+                wasMouseDown = isMouseDown;
+                return;
             }
 
             if (disconnectBtn.contains(mx, my)) {

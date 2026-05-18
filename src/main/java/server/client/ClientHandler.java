@@ -296,6 +296,20 @@ public class ClientHandler {
                         break;
                     }
 
+                    case Packets.CLIENT_RENDER_DISTANCE: {
+                        int chunks = in.readInt();
+                        chunkTracker.setRenderDistance(chunks);
+                        if (spawned) {
+                            double[] pos = client.getLastPos();
+                            if (pos != null) {
+                                final double fx = pos[0], fy = pos[1], fz = pos[2];
+                                final Client c = client;
+                                c.send(o -> chunkTracker.update(fx, fy, fz, o));
+                            }
+                        }
+                        break;
+                    }
+
                     default:
                         System.err.println("Unknown packet id: " + packetId);
                         break;
@@ -315,6 +329,7 @@ public class ClientHandler {
                             pos[0], pos[1], pos[2],
                             client.getLastYaw(), client.getLastPitch());
                 }
+
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
                 Server.skins.remove(client.getUsername());

@@ -83,6 +83,8 @@ public class SocketClient implements Runnable {
 
             uploadSkinIfPresent();
 
+            sendRenderDistance(client.Settings.getRenderDistance());
+
             setLoading("Requesting level...", Color.WHITE);
             out.writeByte(Packets.REQUEST_LEVEL);
             out.flush();
@@ -253,6 +255,19 @@ public class SocketClient implements Runnable {
             out.writeLong(timestamp);
             out.writeBoolean(false);
             out.flush();
+        }
+    }
+
+    public static void sendRenderDistance(int chunks) {
+        if (out == null) return;
+        try {
+            synchronized (writeLock) {
+                out.writeByte(Packets.CLIENT_RENDER_DISTANCE);
+                out.writeInt(chunks);
+                out.flush();
+            }
+        } catch (IOException e) {
+            System.err.println("sendRenderDistance failed: " + e.getMessage());
         }
     }
 

@@ -350,11 +350,9 @@ public class Minecraft implements Runnable {
             if(pauseMenu.visible) {
                 pauseMenu.visible = false;
                 Mouse.setGrabbed(true);
-            } else if(!chat.toggled) {
+            } else {
                 pauseMenu.visible = true;
                 Mouse.setGrabbed(false);
-            } else {
-                chat.setToggled(false);
             }
         }
         EscWasDown = escDown;
@@ -468,16 +466,18 @@ public class Minecraft implements Runnable {
 
             skyRenderer.render();
 
+            float gamma = Settings.gammaMultiplier();
+
             sunPosBuf.clear();
             sunPosBuf.put(sun[0]).put(sun[1]).put(sun[2]).put(0f).flip();
             GL.light(GL.LIGHT0, GL.POSITION, sunPosBuf);
 
             ambientBuf.clear();
-            ambientBuf.put(ambient[0]).put(ambient[1]).put(ambient[2]).put(1f).flip();
+            ambientBuf.put(ambient[0] * gamma).put(ambient[1] * gamma).put(ambient[2] * gamma).put(1f).flip();
             GL.light(GL.LIGHT0, GL.AMBIENT, ambientBuf);
 
             diffuseBuf.clear();
-            diffuseBuf.put(diffuse[0]).put(diffuse[1]).put(diffuse[2]).put(1f).flip();
+            diffuseBuf.put(diffuse[0] * gamma).put(diffuse[1] * gamma).put(diffuse[2] * gamma).put(1f).flip();
             GL.light(GL.LIGHT0, GL.DIFFUSE, diffuseBuf);
 
             GL.enable(GL.LIGHTING);
