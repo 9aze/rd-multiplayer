@@ -5,24 +5,15 @@ import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Level {
-
     public static final int CHUNK_SIZE = LevelChunk.CHUNK_SIZE; // 16
-
     private static final Path CHUNK_DIR = Paths.get("chunks");
-
     private final ConcurrentHashMap<Long, LevelChunk> loadedChunks = new ConcurrentHashMap<>();
+    private final RegionStore regionStore = new RegionStore(CHUNK_DIR);
 
     public Level() {}
 
-    /**
-     * Pack (cx, cy, cz) into a single long. Each component is signed 21 bits,
-     * range [-2^20, 2^20-1] = ±1,048,575 chunks = ±16.7M blocks. Vastly more
-     * than enough for any reasonable play area.
-     */
     private static long key(int cx, int cy, int cz) {
-        return ((long)(cx & 0x1FFFFF) << 42)
-             | ((long)(cy & 0x1FFFFF) << 21)
-             |  (long)(cz & 0x1FFFFF);
+        return ((long)(cx & 0x1FFFFF) << 42) | ((long)(cy & 0x1FFFFF) << 21) |  (long)(cz & 0x1FFFFF);
     }
 
     public LevelChunk getOrLoadChunk(int cx, int cy, int cz) {
@@ -31,26 +22,34 @@ public class Level {
         if (chunk != null) return chunk;
 
         chunk = new LevelChunk(cx, cy, cz);
-        if (!chunk.load(CHUNK_DIR)) {
+        byte[] data = regionStore.read(cx, cy, cz);
+        if (data != null) {
+            System.arraycopy(data, 0, chunk.blocks, 0, LevelChunk.VOLUME);
+            chunk.onLoaded();
+        } else {
             WorldGenerator.generate(chunk);
         }
-        // Concurrency: another thread might have loaded the same chunk in
-        // parallel. putIfAbsent and return whichever wins.
+
         LevelChunk prior = loadedChunks.putIfAbsent(k, chunk);
         return prior != null ? prior : chunk;
     }
 
     public void unloadChunk(int cx, int cy, int cz) {
         LevelChunk chunk = loadedChunks.remove(key(cx, cy, cz));
-        if (chunk != null) {
-            chunk.save(CHUNK_DIR);
+        if (chunk != null && chunk.isDirty()) {
+            regionStore.write(cx, cy, cz, chunk.blocks);
+            chunk.clearDirty();
         }
     }
 
     public void saveAll() {
         for (LevelChunk chunk : loadedChunks.values()) {
-            chunk.save(CHUNK_DIR);
+            if (chunk.isDirty()) {
+                regionStore.write(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.blocks);
+                chunk.clearDirty();
+            }
         }
+        regionStore.closeAll();
         System.out.println("All chunks saved.");
     }
 

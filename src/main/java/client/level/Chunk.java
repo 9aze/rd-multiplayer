@@ -5,6 +5,7 @@ import client.gfx.GL;
 import client.level.block.BlockRegistry;
 import client.level.block.Block;
 import client.phys.AABB;
+
 import java.nio.FloatBuffer;
 
 public class Chunk {
@@ -13,7 +14,7 @@ public class Chunk {
 
     public static int rebuiltThisFrame;
     public static int updates;
-    private static final int MAX_FIRST_BUILDS = 4;
+    private static final int MAX_REBUILDS_PER_FRAME = 8;
 
     private final Level level;
 
@@ -88,14 +89,13 @@ public class Chunk {
 
     public void render(int layer) {
         if (this.dirty) {
-            boolean firstTime = !built[0];
-            if (firstTime && rebuiltThisFrame >= MAX_FIRST_BUILDS) return;
+            if (rebuiltThisFrame >= MAX_REBUILDS_PER_FRAME) return;
 
             compile(0);
             compile(1);
             this.dirty = false;
 
-            if (firstTime) rebuiltThisFrame++;
+            rebuiltThisFrame++;
         }
 
         if (!built[layer]) return;

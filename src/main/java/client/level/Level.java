@@ -17,9 +17,8 @@ public class Level {
     private final ArrayList<LevelListener> levelListeners = new ArrayList<>();
 
     public Level() {}
-
     private static long chunkKey(int cx, int cy, int cz) {
-        return ((long)(cx & 0x1FFFFF) << 42) | ((long)(cy & 0x1FFFFF) << 21) |  (long)(cz & 0x1FFFFF);
+        return ((long)(cx & 0x1FFFFF) << 42) | ((long)(cy & 0x1FFFFF) << 21) | (long)(cz & 0x1FFFFF);
     }
 
     private static long columnKey(int cx, int cz) {
@@ -75,8 +74,6 @@ public class Level {
         java.util.Arrays.fill(tops, Integer.MIN_VALUE);
         int remaining = tops.length;
 
-        // Walk chunks top-down. For each (lx, lz) still unresolved, find its
-        // topmost solid block in this chunk.
         for (java.util.Iterator<Integer> it = ys.descendingIterator(); it.hasNext() && remaining > 0; ) {
             int cy = it.next();
             byte[] data = chunks.get(chunkKey(cx, cy, cz));
@@ -108,8 +105,6 @@ public class Level {
     private static int unpackCY(long k) { return signExtend21((k >> 21) & 0x1FFFFF); }
     private static int unpackCZ(long k) { return signExtend21( k        & 0x1FFFFF); }
 
-    // --- block access ---
-
     public byte getRawBlock(int x, int y, int z) {
         int cx = Math.floorDiv(x, CHUNK_SIZE);
         int cy = Math.floorDiv(y, CHUNK_SIZE);
@@ -120,6 +115,10 @@ public class Level {
         int ly = Math.floorMod(y, CHUNK_SIZE);
         int lz = Math.floorMod(z, CHUNK_SIZE);
         return data[(ly * CHUNK_SIZE + lz) * CHUNK_SIZE + lx];
+    }
+
+    public byte[] getChunkData(int cx, int cy, int cz) {
+        return chunks.get(chunkKey(cx, cy, cz));
     }
 
     public boolean isTile(int x, int y, int z) {
@@ -183,8 +182,6 @@ public class Level {
         int lz = Math.floorMod(z, CHUNK_SIZE);
         data[(ly * CHUNK_SIZE + lz) * CHUNK_SIZE + lx] = (byte) id;
 
-        // Heightmap may need an update at this XZ if the change is at or above
-        // the current top (placing higher, or breaking the current top).
         int[] tops = heightMap.get(columnKey(cx, cz));
         int currentTop = (tops == null) ? Integer.MIN_VALUE : tops[lx + lz * CHUNK_SIZE];
         if (currentTop == Integer.MIN_VALUE || y >= currentTop) {

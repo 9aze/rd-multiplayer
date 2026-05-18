@@ -118,13 +118,24 @@ public class LevelRenderer implements LevelListener {
             rc = new Chunk(level, cx, cy, cz);
             renderChunks.put(key, rc);
 
-            int minX = cx * CHUNK_SIZE, minY = cy * CHUNK_SIZE, minZ = cz * CHUNK_SIZE;
-            int maxX = minX + CHUNK_SIZE, maxY = minY + CHUNK_SIZE, maxZ = minZ + CHUNK_SIZE;
-            for (int x = minX; x < maxX; x++)
-                for (int y = minY; y < maxY; y++)
-                    for (int z = minZ; z < maxZ; z++)
-                        if ((level.getRawBlock(x, y, z) & 0xFF) == BlockRegistry.TNT.id)
-                            tntPositions.add(packTnt(x, y, z));
+            byte[] data = level.getChunkData(cx, cy, cz);
+            if (data != null) {
+                int tntId = BlockRegistry.TNT.id;
+                int baseX = cx * CHUNK_SIZE;
+                int baseY = cy * CHUNK_SIZE;
+                int baseZ = cz * CHUNK_SIZE;
+                int idx = 0;
+                for (int ly = 0; ly < CHUNK_SIZE; ly++) {
+                    for (int lz = 0; lz < CHUNK_SIZE; lz++) {
+                        for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+                            if ((data[idx] & 0xFF) == tntId) {
+                                tntPositions.add(packTnt(baseX + lx, baseY + ly, baseZ + lz));
+                            }
+                            idx++;
+                        }
+                    }
+                }
+            }
         }
         rc.setDirty();
     }
