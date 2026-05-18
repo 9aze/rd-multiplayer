@@ -202,9 +202,15 @@ public class SocketClient implements Runnable {
                         break;
                     }
 
-                    default:
-                        System.err.println("Unknown packet: " + packetId);
+                    case Packets.TIME_OF_DAY: {
+                        float fraction = in.readFloat();
+                        long  cycleLen = in.readLong();
+                        client.world.WorldTime.syncFromServer(fraction, cycleLen);
                         break;
+                    }
+
+                    default:
+                        throw new IOException("Unknown packet id: " + packetId + " stream desynced, closing connection");
                 }
             }
 
