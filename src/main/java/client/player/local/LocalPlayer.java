@@ -133,7 +133,14 @@ public class LocalPlayer {
 
         while (Keyboard.next()) {
             if (Keyboard.getEventKeyState()) {
-                int key = Keyboard.getEventKey();
+                int  key = Keyboard.getEventKey();
+                char ch  = Keyboard.getEventCharacter();
+
+                // Route to Annoy submenu if open
+                if (client.client.modules.AnnoyModule.submenuOpen) {
+                    client.client.modules.AnnoyModule.handleKey(key, ch);
+                    continue;
+                }
 
                 if (key == Keyboard.KEY_T && !Minecraft.mc.chat.toggled) {
                     Minecraft.mc.chat.setToggled(true);
@@ -159,8 +166,7 @@ public class LocalPlayer {
                 }
 
                 if (Minecraft.mc.chat.toggled) {
-                    char c = Keyboard.getEventCharacter();
-                    Minecraft.mc.chat.handleKey(key, c);
+                    Minecraft.mc.chat.handleKey(key, ch);
                 }
             }
         }

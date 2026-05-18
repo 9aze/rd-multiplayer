@@ -39,21 +39,11 @@ public class ClientMod {
     }
 
     public void onRender(int width, int height) {
-        // Feed keyboard events to Annoy submenu if open
-        if (client.client.modules.AnnoyModule.submenuOpen) {
-            while (Keyboard.next()) {
-                if (!Keyboard.getEventKeyState()) continue;
-                client.client.modules.AnnoyModule.handleKey(
-                    Keyboard.getEventKey(),
-                    Keyboard.getEventCharacter());
-            }
-        } else {
-            // Normal key polling
-            for (int k = 0; k < keyWasDown.length; k++) {
-                boolean down = Keyboard.isKeyDown(k);
-                if (down && !keyWasDown[k]) onKeyPressed(k);
-                keyWasDown[k] = down;
-            }
+        // Normal key polling
+        for (int k = 0; k < keyWasDown.length; k++) {
+            boolean down = Keyboard.isKeyDown(k);
+            if (down && !keyWasDown[k]) onKeyPressed(k);
+            keyWasDown[k] = down;
         }
 
         // ESP
