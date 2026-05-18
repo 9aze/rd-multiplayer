@@ -124,6 +124,8 @@ public class ClientHandler {
                 });
             }
 
+            server.net.TimeBroadcaster.sendTo(client);
+
             while (true) {
                 packetId = in.readByte();
 
@@ -313,7 +315,6 @@ public class ClientHandler {
                             pos[0], pos[1], pos[2],
                             client.getLastYaw(), client.getLastPitch());
                 }
-
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
                 Server.skins.remove(client.getUsername());
