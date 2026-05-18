@@ -215,23 +215,6 @@ public class ClientHandler {
                         in.readInt();
                         if (!spawned) break;
 
-                        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z) || Math.abs(x) > 1_000_000 || Math.abs(y) > 1_000_000 || Math.abs(z) > 1_000_000) {
-                            System.err.printf("%s sent nonsense position (%.3f, %.3f, %.3f) — snapping back%n",
-                                    client.getUsername(), x, y, z);
-                            double[] validPos = client.getLastPos();
-                            if (validPos != null) {
-                                final Client c = client;
-                                final double rx = validPos[0], ry = validPos[1], rz = validPos[2];
-                                c.send(o -> {
-                                    o.writeByte(Packets.SET_POS);
-                                    o.writeDouble(rx);
-                                    o.writeDouble(ry);
-                                    o.writeDouble(rz);
-                                });
-                            }
-                            break;
-                        }
-
                         long now = System.currentTimeMillis();
                         if (!AntiCheat.checkMovement(client, x, y, z, now)) {
                             double[] validPos = client.getLastPos();
@@ -327,17 +310,10 @@ public class ClientHandler {
             chunkTracker.clear();
             if (client != null) {
                 double[] pos = client.getLastPos();
-                if (pos != null && Double.isFinite(pos[0]) && Double.isFinite(pos[1]) && Double.isFinite(pos[2])
-                        && Math.abs(pos[0]) <= 1_000_000
-                        && Math.abs(pos[1]) <= 1_000_000
-                        && Math.abs(pos[2]) <= 1_000_000) {
+                if (pos != null) {
                     Server.authDb.savePosition(client.getUsername(),
                             pos[0], pos[1], pos[2],
                             client.getLastYaw(), client.getLastPitch());
-                } else if (pos != null) {
-                    System.err.printf("Not saving nonsense position for %s: (%.3f, %.3f, %.3f)%n",
-                            client.getUsername(), pos[0], pos[1], pos[2]);
-                }
 
                 Server.clients.remove(client);
                 Server.lastKeepAlive.remove(client);
