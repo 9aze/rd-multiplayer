@@ -350,9 +350,11 @@ public class Minecraft implements Runnable {
             if(pauseMenu.visible) {
                 pauseMenu.visible = false;
                 Mouse.setGrabbed(true);
-            } else {
+            } else if(!chat.toggled) {
                 pauseMenu.visible = true;
                 Mouse.setGrabbed(false);
+            } else {
+                chat.setToggled(false);
             }
         }
         EscWasDown = escDown;
