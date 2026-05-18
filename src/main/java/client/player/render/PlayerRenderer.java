@@ -47,9 +47,13 @@ public class PlayerRenderer {
             snapshot = new ArrayList<>(playerManager.getPlayers().entrySet());
         }
 
+        String myName = Minecraft.mc.username;
+
         beginPlayerRender();
 
         for (Map.Entry<String, RemotePlayer> entry : snapshot) {
+            if (myName != null && myName.equalsIgnoreCase(entry.getKey())) continue;
+
             RemotePlayer pos = entry.getValue();
             uploadPendingSkin(pos);
             updateAnimation(pos, now);
@@ -100,8 +104,13 @@ public class PlayerRenderer {
         glDepthMask(false);
         glDisable(GL_CULL_FACE);
 
+        String myName = Minecraft.mc.username;
+
         for (Map.Entry<String, RemotePlayer> entry : playerManager.getPlayers().entrySet()) {
             String name = entry.getKey();
+            // Don't draw our own name tag on the broadcast-position clone.
+            if (myName != null && myName.equalsIgnoreCase(name)) continue;
+
             RemotePlayer pos = entry.getValue();
 
             glPushMatrix();
