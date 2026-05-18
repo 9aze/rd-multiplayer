@@ -24,6 +24,7 @@ public class SpamPlaceModule extends Module {
     private static final double EYE_HEIGHT   = 1.6;
     private static final double MAX_REACH    = 9.0;
     private static final long   MS_PER_PLACE = 220;
+    private static final int    PER_TICK     = 4; // place 4 blocks at once
     private long lastPlace = 0;
 
     public SpamPlaceModule() {
@@ -42,18 +43,21 @@ public class SpamPlaceModule extends Module {
 
         long now = System.currentTimeMillis();
         if (now - lastPlace < MS_PER_PLACE) return;
+        lastPlace = now;
 
         int cx = (int) Math.floor(mc.localPlayer.x);
         int cy = (int) Math.floor(mc.localPlayer.y);
         int cz = (int) Math.floor(mc.localPlayer.z);
         int blockId = BLOCK_IDS[selectedBlockIndex];
+        int placed = 0;
 
+        outer:
         for (int dy = -1; dy <= 3; dy++) {
             for (int dx = -RADIUS; dx <= RADIUS; dx++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+                    if (placed >= PER_TICK) break outer;
                     int bx = cx+dx, by = cy+dy, bz = cz+dz;
                     if (mc.level.isSolidTile(bx, by, bz)) continue;
-                    // Don't place inside player
                     if (Math.abs(dx)<=1 && dy>=-1 && dy<=1 && Math.abs(dz)<=1) continue;
 
                     double ddx = (bx+0.5)-mc.localPlayer.x;
@@ -64,8 +68,7 @@ public class SpamPlaceModule extends Module {
                     try {
                         mc.level.setTile(bx, by, bz, blockId);
                         SocketClient.sendBlock(Packets.BLOCK_PLACE, bx, by, bz, blockId);
-                        lastPlace = now;
-                        return;
+                        placed++;
                     } catch (Exception e) { }
                 }
             }
