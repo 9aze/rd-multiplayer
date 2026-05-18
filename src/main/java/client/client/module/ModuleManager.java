@@ -24,6 +24,7 @@ public class ModuleManager {
         register(new ScaffoldModule());
         register(new AutoHighwayModule());
         register(new MineAuraModule());
+        register(new CapsuleAuraModule());
         register(new FlattenModule());
         register(new SpamPlaceModule());
         register(new NukeModule());

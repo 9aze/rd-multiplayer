@@ -392,7 +392,17 @@ public class Minecraft implements Runnable {
 
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
-            if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
+            if (level != null) {
+                level.setTile(update[0], update[1], update[2], update[3]);
+                // CapsuleAura: restore broken capsule blocks
+                if (update[3] == 0 && clientMod != null) {
+                    client.client.modules.CapsuleAuraModule capsule =
+                        (client.client.modules.CapsuleAuraModule)
+                        clientMod.moduleManager.getByName("CapsuleAura");
+                    if (capsule != null && capsule.isEnabled())
+                        capsule.onBlockBroken(update[0], update[1], update[2]);
+                }
+            }
         }
         if (localPlayer != null && socket != null && socket.isConnected()) localPlayer.tick();
         if (clientMod != null) clientMod.onTick();
