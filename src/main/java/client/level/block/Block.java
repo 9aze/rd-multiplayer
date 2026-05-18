@@ -3,6 +3,7 @@ package client.level.block;
 import client.level.FaceTextures;
 import client.level.Level;
 import client.level.Tessellator;
+import client.level.VertexSink;
 
 public abstract class Block {
     public final int id;
@@ -28,7 +29,7 @@ public abstract class Block {
     private static float minU(int col) { return col / 16f; }
     private static float maxU(int col) { return col / 16f + 16 / 256f; }
 
-    public void render(Tessellator t, Level level, int layer, int x, int y, int z) {
+    public void render(VertexSink t, Level level, int layer, int x, int y, int z) {
 
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
@@ -90,7 +91,7 @@ public abstract class Block {
     }
 
     private void face(
-            Tessellator t, Level level, int layer,
+            VertexSink t, Level level, int layer,
             int x, int y, int z,
             float shade,
             float nx, float ny, float nz,
@@ -105,8 +106,8 @@ public abstract class Block {
             float u2,float v2,
             float u3,float v3
     ) {
-
-        if (level.isSolidTile(x, y, z)) return;
+        boolean culled = (ny != 0) ? level.isSolidForCullingY(x, y, z) : level.isSolidForCulling(x, y, z);
+        if (culled) return;
 
         float b = level.getBrightness(x, y, z) * shade;
 

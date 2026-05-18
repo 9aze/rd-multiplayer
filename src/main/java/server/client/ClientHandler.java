@@ -7,6 +7,7 @@ import server.Server;
 import server.level.Level;
 import server.level.LevelChunk;
 import server.level.TntManager;
+import server.level.WorldGenerator;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -168,7 +169,7 @@ public class ClientHandler {
                             o.writeDouble(spawnY);
                             o.writeDouble(spawnZ);
                         });
-                        c.send(o -> chunkTracker.update(spawnX, spawnZ, o));
+                        c.send(o -> chunkTracker.update(spawnX, spawnY, spawnZ, o));
                         spawned = true;
                         break;
                     }
@@ -229,30 +230,9 @@ public class ClientHandler {
 
                         client.setLastRotation(yaw, pitch);
 
-                        // void check
-                        if (y < Server.VOID_Y) {
-                            double[] respawn = findSpawnPosition();
-                            final double rx = respawn[0], ry = respawn[1], rz = respawn[2];
-                            client.setLastPos(rx, ry, rz, now);
-                            client.setMoveTokens(Server.MOVE_BURST, now);
-
-                            final Client c = client;
-                            c.send(o -> {
-                                o.writeByte(Packets.SET_POS);
-                                o.writeDouble(rx);
-                                o.writeDouble(ry);
-                                o.writeDouble(rz);
-                            });
-                            c.send(o -> chunkTracker.update(rx, rz, o));
-
-                            System.out.printf("Respawned %s from void (y=%.1f) to (%.1f, %.1f, %.1f)%n",
-                                    client.getUsername(), y, rx, ry, rz);
-                            break;
-                        }
-
-                        final double fx = x, fz = z;
+                        final double fx = x, fy = y, fz = z;
                         final Client c = client;
-                        c.send(o -> chunkTracker.update(fx, fz, o));
+                        c.send(o -> chunkTracker.update(fx, fy, fz, o));
                         Broadcaster.broadcastPos(client, x, y, z, yaw, pitch);
                         break;
                     }
@@ -349,37 +329,17 @@ public class ClientHandler {
     private static final java.util.Random SPAWN_RNG = new java.util.Random();
 
     private static double[] findSpawnPosition() {
-        int depth = Server.level.getDepth();
-
         for (int attempt = 0; attempt < 20; attempt++) {
             double angle  = SPAWN_RNG.nextDouble() * 2.0 * Math.PI;
             double radius = Math.sqrt(SPAWN_RNG.nextDouble()) * SPAWN_RADIUS;
             int x = (int) Math.round(SPAWN_CENTER + radius * Math.cos(angle));
             int z = (int) Math.round(SPAWN_CENTER + radius * Math.sin(angle));
 
-            int surfaceY = findSurfaceY(x, z, depth);
-            if (surfaceY >= 0) {
-                return new double[]{ x + 0.5, surfaceY + 1.0, z + 0.5 };
-            }
+            boolean desert = WorldGenerator.biomeIsDesert(x, z);
+            int surfaceY = WorldGenerator.surfaceY(x, z, desert);
+            return new double[]{ x + 0.5, surfaceY + 1.0, z + 0.5 };
         }
-
-        return new double[]{ SPAWN_CENTER + 0.5, depth + 1.0, SPAWN_CENTER + 0.5 };
-    }
-
-    private static int findSurfaceY(int x, int z, int depth) {
-        int cx = Math.floorDiv(x, Level.CHUNK_SIZE);
-        int cz = Math.floorDiv(z, Level.CHUNK_SIZE);
-        LevelChunk chunk = Server.level.getOrLoadChunk(cx, cz);
-
-        int lx = Math.floorMod(x, Level.CHUNK_SIZE);
-        int lz = Math.floorMod(z, Level.CHUNK_SIZE);
-
-        for (int y = depth - 1; y >= 0; y--) {
-            if (chunk.getBlock(lx, y, lz) != 0) {
-                return y + 1;
-            }
-        }
-        return -1;
+        return new double[]{ SPAWN_CENTER + 0.5, WorldGenerator.MAX_SURFACE + 1.0, SPAWN_CENTER + 0.5 };
     }
 
     private static void reject(DataOutputStream out, Socket socket, String reason) throws IOException {

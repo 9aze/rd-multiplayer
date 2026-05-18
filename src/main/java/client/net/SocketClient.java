@@ -54,7 +54,6 @@ public class SocketClient implements Runnable {
 
             setLoading("Creating network streams...", Color.WHITE);
 
-            // lookup stored tokens and authenticate
             String storedToken = AuthStore.getToken(serverId, username);
             if (storedToken == null) storedToken = "";
 
@@ -88,7 +87,7 @@ public class SocketClient implements Runnable {
             out.writeByte(Packets.REQUEST_LEVEL);
             out.flush();
 
-            setLoading("Waiting for level data...", Color.WHITE);
+            setLoading("Waiting for chunks...", Color.WHITE);
 
             while (true) {
                 byte packetId = in.readByte();
@@ -103,41 +102,25 @@ public class SocketClient implements Runnable {
                     }
 
                     case Packets.CHUNK_DATA: {
-                        int cx = in.readInt(); int cz = in.readInt(); int depth = in.readInt(); int len = in.readInt();
-                        byte[] data = new byte[len];
+                        int cx = in.readInt();
+                        int cy = in.readInt();
+                        int cz = in.readInt();
+                        byte[] data = new byte[16 * 16 * 16];
                         in.readFully(data);
                         Level level = Minecraft.mc.level;
                         if (level != null) {
-                            level.loadChunk(cx, cz, depth, data);
+                            level.loadChunk(cx, cy, cz, data);
                             if (!Minecraft.mc.levelReady) Minecraft.mc.levelReady = true;
                         }
                         break;
                     }
 
                     case Packets.CHUNK_UNLOAD: {
-                        int cx = in.readInt(), cz = in.readInt();
+                        int cx = in.readInt();
+                        int cy = in.readInt();
+                        int cz = in.readInt();
                         Level level = Minecraft.mc.level;
-                        if (level != null) level.unloadChunk(cx, cz);
-                        break;
-                    }
-
-                    case Packets.LEVEL_DATA: {
-                        setLoading("Receiving level metadata...", Color.WHITE);
-                        int w = in.readInt(), h = in.readInt(), d = in.readInt();
-                        int len = in.readInt();
-
-                        setLoading("Downloading world (" + len + " bytes)...", Color.WHITE);
-                        byte[] blocks = new byte[len];
-                        in.readFully(blocks);
-
-                        setLoading("Applying world...", Color.WHITE);
-                        Minecraft.mc.pendingWidth  = w;
-                        Minecraft.mc.pendingHeight = h;
-                        Minecraft.mc.pendingDepth  = d;
-                        Minecraft.mc.pendingBlocks = blocks;
-                        Minecraft.mc.levelUpdatePending = true;
-
-                        setLoading("Level loaded successfully!", Color.GREEN);
+                        if (level != null) level.unloadChunk(cx, cy, cz);
                         break;
                     }
 

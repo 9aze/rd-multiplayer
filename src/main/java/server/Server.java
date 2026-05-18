@@ -1,6 +1,5 @@
 package server;
 
-import com.google.gson.*;
 import server.auth.AuthDatabase;
 import server.client.Client;
 import server.client.ClientHandler;
@@ -36,7 +35,9 @@ public class Server {
     public static double  PLACE_RATE     = 5.0;    // places / sec
     public static double  BREAK_RATE     = 5.0;    // breaks / sec
     public static int     RENDER_DISTANCE = 8;
-    public static double  VOID_Y         = -32.0;
+    /** Vertical render distance, in cubic chunks (each 16 tall). */
+    public static int     VERTICAL_RENDER_DISTANCE = 4;
+    public static double  VOID_Y         = -64.0;
     public static boolean LOGS = true;
 
     public static Level level;
@@ -53,7 +54,7 @@ public class Server {
         authDb = new AuthDatabase(AUTH_DB_PATH.toString());
         System.out.println("Auth database opened at " + AUTH_DB_PATH);
 
-        level = new Level(64);
+        level = new Level();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Saving all chunks...");
@@ -110,15 +111,16 @@ public class Server {
             PLAYER_LIMIT = Integer.parseInt(p.getProperty("player_limit", "50"));
             MAX_PER_IP   = Integer.parseInt(p.getProperty("max_per_ip",   "3"));
 
-            ANTICHEAT       = Boolean.parseBoolean(p.getProperty("anticheat",       "true"));
-            MAX_REACH       = Double.parseDouble (p.getProperty("max_reach",        "10.0"));
-            MOVE_RATE       = Double.parseDouble (p.getProperty("move_rate",        "20.0"));
-            MOVE_BURST      = Double.parseDouble (p.getProperty("move_burst",       "10.0"));
-            PLACE_RATE      = Double.parseDouble (p.getProperty("place_rate",       "5.0"));
-            BREAK_RATE      = Double.parseDouble (p.getProperty("break_rate",       "5.0"));
-            RENDER_DISTANCE = Integer.parseInt   (p.getProperty("render_distance",  "8"));
-            VOID_Y          = Double.parseDouble (p.getProperty("void_y",           "-32.0"));
-            LOGS            = Boolean.parseBoolean(p.getProperty("logs", "true"));
+            ANTICHEAT                = Boolean.parseBoolean(p.getProperty("anticheat",       "true"));
+            MAX_REACH                = Double.parseDouble (p.getProperty("max_reach",        "10.0"));
+            MOVE_RATE                = Double.parseDouble (p.getProperty("move_rate",        "20.0"));
+            MOVE_BURST               = Double.parseDouble (p.getProperty("move_burst",       "10.0"));
+            PLACE_RATE               = Double.parseDouble (p.getProperty("place_rate",       "5.0"));
+            BREAK_RATE               = Double.parseDouble (p.getProperty("break_rate",       "5.0"));
+            RENDER_DISTANCE          = Integer.parseInt   (p.getProperty("render_distance",  "8"));
+            VERTICAL_RENDER_DISTANCE = Integer.parseInt   (p.getProperty("vertical_render_distance", "4"));
+            VOID_Y                   = Double.parseDouble (p.getProperty("void_y",           "-64.0"));
+            LOGS                     = Boolean.parseBoolean(p.getProperty("logs", "true"));
 
             System.out.println("Loaded server.properties");
         } catch (Exception e) {
@@ -129,17 +131,18 @@ public class Server {
 
     private static void createDefaultProperties() throws IOException {
         Properties d = new Properties();
-        d.setProperty("port",            "9090");
-        d.setProperty("player_limit",    "50");
-        d.setProperty("max_per_ip",      "3");
-        d.setProperty("anticheat",       "true");
-        d.setProperty("max_reach",       "10.0");
-        d.setProperty("move_rate",       "20.0");
-        d.setProperty("move_burst",      "10.0");
-        d.setProperty("place_rate",      "5.0");
-        d.setProperty("break_rate",      "5.0");
-        d.setProperty("render_distance", "8");
-        d.setProperty("void_y",          "-32.0");
+        d.setProperty("port",                      "9090");
+        d.setProperty("player_limit",              "50");
+        d.setProperty("max_per_ip",                "3");
+        d.setProperty("anticheat",                 "true");
+        d.setProperty("max_reach",                 "10.0");
+        d.setProperty("move_rate",                 "20.0");
+        d.setProperty("move_burst",                "10.0");
+        d.setProperty("place_rate",                "5.0");
+        d.setProperty("break_rate",                "5.0");
+        d.setProperty("render_distance",           "8");
+        d.setProperty("vertical_render_distance",  "4");
+        d.setProperty("void_y",                    "-64.0");
         try (OutputStream out = Files.newOutputStream(PROPERTIES_PATH)) {
             d.store(out, "Server Properties");
         }
