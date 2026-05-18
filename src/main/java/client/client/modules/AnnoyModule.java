@@ -11,13 +11,10 @@ public class AnnoyModule extends Module {
 
     public static String  message     = "lol get trolled";
     public static boolean submenuOpen = false;
-
     private static final StringBuilder inputBuf = new StringBuilder("lol get trolled");
-    private static long lastSend  = 0;
-    private static final long INTERVAL = 300; // fast - no server chat rate limit
 
-    // Key debounce
-    private static final boolean[] keyWas = new boolean[256];
+    private static long lastSend   = 0;
+    private static final long INTERVAL = 300;
 
     public AnnoyModule() {
         super("Annoy", "Spam a message in chat", Category.MISC);
@@ -31,68 +28,64 @@ public class AnnoyModule extends Module {
         Minecraft mc = Minecraft.mc;
         if (mc == null || mc.localPlayer == null) return;
         if (submenuOpen) return;
-
         long now = System.currentTimeMillis();
         if (now - lastSend < INTERVAL) return;
         lastSend = now;
-
         try { SocketClient.sendChat(mc.username, message); }
         catch (Exception e) { }
+    }
+
+    // Called from ClientMod when submenu is open
+    public static void handleKey(int key, char c) {
+        if (key == org.lwjgl.input.Keyboard.KEY_BACK) {
+            if (inputBuf.length() > 0)
+                inputBuf.deleteCharAt(inputBuf.length()-1);
+        } else if (key == org.lwjgl.input.Keyboard.KEY_RETURN) {
+            message     = inputBuf.toString();
+            submenuOpen = false;
+        } else if (key == org.lwjgl.input.Keyboard.KEY_ESCAPE) {
+            submenuOpen = false;
+        } else if (c >= 32 && c < 127 && inputBuf.length() < 60) {
+            inputBuf.append(c);
+        }
     }
 
     @Override
     public void onRender(int width, int height) {
         if (!submenuOpen) return;
-        renderEditor(width, height);
-    }
 
-    private void renderEditor(int sw, int sh) {
-        int pw = 320, ph = 90;
-        int px = sw/2 - pw/2, py = sh/2 - ph/2;
+        int pw = 320, ph = 96;
+        int px = width/2 - pw/2, py = height/2 - ph/2;
 
-        setupOrtho(sw, sh);
+        setupOrtho(width, height);
 
         // Shadow
-        drawRect(px+4, py+4, px+pw+4, py+ph+4, new Color(0,0,0,80));
-        // Background
-        drawRect(px, py, px+pw, py+ph, new Color(16,16,22,248));
+        drawRect(px+4, py+4, px+pw+4, py+ph+4, new Color(0,0,0,70));
+        // Body
+        drawRect(px, py, px+pw, py+ph, new Color(14,14,18,250));
         // Top accent
-        drawRect(px, py, px+pw, py+2, new Color(255,180,50,255));
+        drawRect(px, py, px+pw, py+3, new Color(255,180,40,255));
 
         glEnable(GL_TEXTURE_2D);
-        Minecraft.mc.getClientFont().drawString("Annoy Message", px+10, py+8, new Color(255,200,80), true);
+        Minecraft.mc.getClientFont().drawString("Annoy Message", px+10, py+10,
+            new Color(255,200,70), true);
         glDisable(GL_TEXTURE_2D);
 
         // Input box
-        drawRect(px+8, py+26, px+pw-8, py+52, new Color(28,28,36,255));
-        drawRect(px+8, py+26, px+pw-8, py+28, new Color(255,180,50,200));
+        drawRect(px+8,  py+30, px+pw-8, py+56, new Color(22,22,30,255));
+        drawRect(px+8,  py+30, px+pw-8, py+32, new Color(255,180,40,200));
+        drawRect(px+8,  py+54, px+pw-8, py+56, new Color(60,60,80,180));
 
+        // Text + cursor
         String display = inputBuf.toString() + "|";
         glEnable(GL_TEXTURE_2D);
-        Minecraft.mc.getClientFont().drawString(display, px+12, py+34, Color.WHITE, true);
+        Minecraft.mc.getClientFont().drawString(display, px+12, py+38, Color.WHITE, true);
+
+        // Hint
         Minecraft.mc.getClientFont().drawString(
-            "Type message  |  ENTER = save  |  ESC = close",
-            px+8, py+ph-16, new Color(90,90,110), true);
+            "Type  |  ENTER = save  |  ESC = cancel",
+            px+10, py+ph-18, new Color(80,80,100), true);
         glDisable(GL_TEXTURE_2D);
-
-        // Handle keyboard input properly
-        while (org.lwjgl.input.Keyboard.next()) {
-            if (!org.lwjgl.input.Keyboard.getEventKeyState()) continue;
-            int  key = org.lwjgl.input.Keyboard.getEventKey();
-            char c   = org.lwjgl.input.Keyboard.getEventCharacter();
-
-            if (key == org.lwjgl.input.Keyboard.KEY_BACK) {
-                if (inputBuf.length() > 0)
-                    inputBuf.deleteCharAt(inputBuf.length()-1);
-            } else if (key == org.lwjgl.input.Keyboard.KEY_RETURN) {
-                message     = inputBuf.toString();
-                submenuOpen = false;
-            } else if (key == org.lwjgl.input.Keyboard.KEY_ESCAPE) {
-                submenuOpen = false;
-            } else if (c >= 32 && c < 127 && inputBuf.length() < 60) {
-                inputBuf.append(c);
-            }
-        }
 
         restoreOrtho();
     }
