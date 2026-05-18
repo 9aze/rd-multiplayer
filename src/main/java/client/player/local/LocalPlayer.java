@@ -6,6 +6,9 @@ import client.net.SocketClient;
 import client.phys.AABB;
 import global.Packets;
 import org.lwjgl.input.Keyboard;
+import client.client.ClientMod;
+import client.client.modules.SpeedModule;
+import client.client.modules.FlightModule;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,7 +25,7 @@ public class LocalPlayer {
     private float lastSentYaw, lastSentPitch;
     private boolean rotationSentOnce;
 
-    private boolean onGround;
+    public boolean onGround;
 
     public AABB boundingBox;
 
@@ -169,8 +172,18 @@ public class LocalPlayer {
             if (Keyboard.isKeyDown(Keyboard.KEY_D) || Keyboard.isKeyDown(Keyboard.KEY_RIGHT)) strafe++;
         }
 
-        if (flying) {
-            float flySpeed = 0.12F;
+        boolean clientFlight = ClientMod.INSTANCE != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("Flight") != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("Flight").isEnabled();
+        boolean clientSpeed = ClientMod.INSTANCE != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("Speed") != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("Speed").isEnabled();
+        boolean clientAutoSprint = ClientMod.INSTANCE != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("AutoSprint") != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("AutoSprint").isEnabled();
+
+        if (flying || clientFlight) {
+            float flySpeed = clientFlight ? FlightModule.flySpeed : 0.12F;
 
             this.motionY = 0.0D;
 
@@ -197,10 +210,12 @@ public class LocalPlayer {
                 this.motionY = 0.12F;
             }
 
-            boolean sprinting = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)
+            boolean sprinting = clientAutoSprint
+                    || Keyboard.isKeyDown(Keyboard.KEY_LCONTROL)
                     || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
 
-            float speed = sprinting ? 0.08F : 0.04F;
+            float baseSpeed = sprinting ? 0.08F : 0.04F;
+            float speed = clientSpeed ? baseSpeed * SpeedModule.speedMultiplier : baseSpeed;
 
             moveRelative(strafe, forward, this.onGround ? speed : 0.01F);
 
@@ -233,6 +248,17 @@ public class LocalPlayer {
     }
 
     public void move(double x, double y, double z) {
+        boolean noClip = ClientMod.INSTANCE != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("NoClip") != null &&
+                ClientMod.INSTANCE.moduleManager.getByName("NoClip").isEnabled();
+        if (noClip) {
+            this.boundingBox.move(x, y, z);
+            this.onGround = false;
+            this.x = (this.boundingBox.minX + this.boundingBox.maxX) / 2.0D;
+            this.y = this.boundingBox.minY + 1.62D;
+            this.z = (this.boundingBox.minZ + this.boundingBox.maxZ) / 2.0D;
+            return;
+        }
         double prevX = x;
         double prevY = y;
         double prevZ = z;

@@ -17,6 +17,7 @@ import client.player.remote.PlayerManager;
 import client.world.WorldTime;
 import global.Packets;
 import client.net.SocketClient;
+import client.client.ClientMod;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
@@ -47,6 +48,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 public class Minecraft implements Runnable {
     public static Minecraft mc;
+    public ClientMod clientMod;
 
     public String username;
 
@@ -218,6 +220,7 @@ public class Minecraft implements Runnable {
         }
 
         font = new FontRenderer(minecraftFont);
+        clientMod = new ClientMod(font);
         crosshair = new Crosshair(16, "/client/textures/crosshair.png");
         info = new Info(font);
         pauseMenu = new PauseMenu();
@@ -392,6 +395,7 @@ public class Minecraft implements Runnable {
             if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
         }
         if (localPlayer != null && socket != null && socket.isConnected()) localPlayer.tick();
+        if (clientMod != null) clientMod.onTick();
     }
 
     private void toggleFullscreen() {
@@ -543,6 +547,7 @@ public class Minecraft implements Runnable {
             info.render(width, height);
             pauseMenu.render(font, width, height);
             chat.render(width, height);
+            if (clientMod != null) clientMod.onRender(width, height);
         } else if (currentScreen != null) {
             currentScreen.render(font, width, height);
         }
@@ -609,4 +614,5 @@ public class Minecraft implements Runnable {
     public void setScreen(Screen screen) {this.currentScreen = screen;}
     public PlayerManager getPlayerManager() { return playerManager; }
     public Level getLevel() { return level; }
+    public FontRenderer getClientFont() { return font; }
 }
