@@ -98,20 +98,30 @@ public class Chat {
                 continue;
             }
 
+            boolean isGreentext = !msg.system && msg.message.replace(" ", "").startsWith(">");
             String text = msg.system ? msg.author + " " + msg.message : "<" + msg.author + "> " + msg.message;
+            Color color = msg.system ? Color.YELLOW : Color.WHITE;
 
             List<String> lines = wrap(text, width - 10);
 
             for (int j = lines.size() - 1; j >= 0; j--) {
                 drawRect(0, offsetY, width, LINE_HEIGHT, 0f, 0f, 0f, 0.3f);
 
-                font.drawString(lines.get(j), 5, offsetY - 1, msg.system ? Color.YELLOW : Color.WHITE, true);
+                if (isGreentext) {
+                    String line = lines.get(j);
+                    if (j == 0) {
+                        String prefix = "<" + msg.author + "> ";
+                        font.drawString(prefix, 5, offsetY - 1, Color.WHITE, true);
+                        font.drawString(line.substring(prefix.length()), 5 + font.getStringWidth(prefix), offsetY - 1, Color.GREEN, true);
+                    } else {
+                        font.drawString(line, 5, offsetY - 1, Color.GREEN, true);
+                    }
+                } else {
+                    font.drawString(lines.get(j), 5, offsetY - 1, color, true);
+                }
 
                 offsetY -= LINE_HEIGHT;
-
-                if (offsetY < 0) {
-                    return;
-                }
+                if (offsetY < 0) return;
             }
         }
     }
