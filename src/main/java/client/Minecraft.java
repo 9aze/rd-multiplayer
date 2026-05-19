@@ -1,5 +1,6 @@
 package client;
 
+import client.gfx.GL;
 import client.gui.screen.impl.LoadingScreen;
 import client.gui.screen.impl.MenuScreen;
 import client.gui.screen.Screen;
@@ -44,8 +45,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Properties;
 
-import static org.lwjgl.opengl.GL11.*;
-
 public class Minecraft implements Runnable {
     public static Minecraft mc;
     public ClientMod clientMod;
@@ -78,11 +77,6 @@ public class Minecraft implements Runnable {
     public volatile double spawnX = 128.0, spawnY = 67.0, spawnZ = 128.0;
     public volatile boolean spawnReceived = false;
 
-    public int pendingWidth = -1;
-    public int pendingHeight = -1;
-    public int pendingDepth = -1;
-    public byte[] pendingBlocks = null;
-    public volatile boolean levelUpdatePending = false;
     public volatile boolean disconnectPending = false;
 
     private FontRenderer font;
@@ -98,7 +92,6 @@ public class Minecraft implements Runnable {
     public PauseMenu pauseMenu;
     public int fps;
 
-    private final FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
     private final FloatBuffer sunPosBuf  = BufferUtils.createFloatBuffer(4);
     private final FloatBuffer ambientBuf = BufferUtils.createFloatBuffer(4);
     private final FloatBuffer diffuseBuf = BufferUtils.createFloatBuffer(4);
@@ -155,7 +148,7 @@ public class Minecraft implements Runnable {
         this.socket = new SocketClient(ip, port, username);
         this.socketThread = new Thread(socket);
         this.playerManager = new PlayerManager();
-        this.level = new Level(64);
+        this.level = new Level();
 
         socketThread.start();
         this.currentScreen = new LoadingScreen();
@@ -181,7 +174,6 @@ public class Minecraft implements Runnable {
         camera = null;
         playerManager = null;
         levelReady = false;
-        levelUpdatePending = false;
         spawnReceived = false;
         Mouse.setGrabbed(false);
         currentScreen = new MenuScreen();
@@ -193,25 +185,25 @@ public class Minecraft implements Runnable {
         Display.setTitle("rd-multiplayer " + GIT_HASH);
         Display.setVSyncEnabled(true);
         Display.create();
-        glViewport(0, 0, width, height);
+        GL.viewport(0, 0, width, height);
         Keyboard.create();
         Mouse.create();
 
-        glEnable(GL_TEXTURE_2D);
-        glShadeModel(GL_SMOOTH);
-        glClearColor(0.5F, 0.8F, 1.0F, 0.0F);
-        glClearDepth(1.0);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glDepthFunc(GL_LEQUAL);
+        GL.enable(GL.TEXTURE_2D);
+        GL.shadeModel(GL.SMOOTH);
+        GL.clearColor(0.5F, 0.8F, 1.0F, 0.0F);
+        GL.clearDepth(1.0);
+        GL.enable(GL.DEPTH_TEST);
+        GL.enable(GL.CULL_FACE);
+        GL.depthFunc(GL.LEQUAL);
 
-        glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, 0);
-        glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 0);
+        GL.lightModeli(GL.LIGHT_MODEL_LOCAL_VIEWER, 0);
+        GL.lightModeli(GL.LIGHT_MODEL_TWO_SIDE, 0);
 
         zeroAmbientBuf.put(new float[]{0f, 0f, 0f, 1f}).flip();
-        glLightModel(GL_LIGHT_MODEL_AMBIENT, zeroAmbientBuf);
+        GL.lightModel(GL.LIGHT_MODEL_AMBIENT, zeroAmbientBuf);
 
-        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+        GL.colorMaterial(GL.FRONT, GL.AMBIENT_AND_DIFFUSE);
 
         try (InputStream in = FontRenderer.class.getResourceAsStream("/client/fonts/Minecraft.ttf")) {
             minecraftFont = Font.createFont(Font.TRUETYPE_FONT, in).deriveFont(16f);
@@ -249,26 +241,22 @@ public class Minecraft implements Runnable {
 
         if(!(currentScreen instanceof LoadingScreen) && !levelReady) {
             currentScreen = new MenuScreen();
-            glClearColor(0, 0, 0, 1);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            GL.clearColor(0, 0, 0, 1);
+            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
             currentScreen.render(font, width, height);
             Display.update();
         }
 
         while (!levelReady) {
             if (Display.isCloseRequested()) destroy();
-            if (levelUpdatePending) {
-                applyPendingLevel();
-                break;
-            }
             if (Display.wasResized()) {
                 width = Display.getWidth();
                 height = Display.getHeight();
                 if (height <= 0) height = 1;
-                glViewport(0, 0, width, height);
+                GL.viewport(0, 0, width, height);
             }
-            glClearColor(0, 0, 0, 1);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            GL.clearColor(0, 0, 0, 1);
+            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
             currentScreen.render(font, width, height);
             Display.update();
             try { Thread.sleep(16); } catch (InterruptedException ignored) {}
@@ -278,7 +266,7 @@ public class Minecraft implements Runnable {
             levelRenderer = new LevelRenderer(level);
             localPlayer = new LocalPlayer(level);
             camera = new Camera(this);
-            level.forEachLoadedChunk((cx, cz) -> levelRenderer.chunkLoaded(cx, cz));
+            level.forEachLoadedChunk((cx, cy, cz) -> levelRenderer.chunkLoaded(cx, cy, cz));
             currentScreen = null;
 
             Mouse.setGrabbed(true);
@@ -303,7 +291,7 @@ public class Minecraft implements Runnable {
                     width = Display.getWidth();
                     height = Display.getHeight();
                     if (height <= 0) height = 1;
-                    glViewport(0, 0, width, height);
+                    GL.viewport(0, 0, width, height);
                 }
 
                 timer.advanceTime();
@@ -338,10 +326,10 @@ public class Minecraft implements Runnable {
                 width = Display.getWidth();
                 height = Display.getHeight();
                 if (height <= 0) height = 1;
-                glViewport(0, 0, width, height);
+                GL.viewport(0, 0, width, height);
             }
-            glClearColor(0, 0, 0, 1);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            GL.clearColor(0, 0, 0, 1);
+            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
             currentScreen.render(font, width, height);
             Display.update();
             try { Thread.sleep(16); } catch (InterruptedException ignored) {}
@@ -349,36 +337,21 @@ public class Minecraft implements Runnable {
         destroy();
     }
 
-    private void applyPendingLevel() {
-        if (!levelUpdatePending) return;
-
-        this.level = new Level(pendingDepth);
-        this.level.loadLevel(pendingWidth, pendingHeight, pendingDepth, pendingBlocks);
-        this.levelRenderer = new LevelRenderer(this.level);
-        this.localPlayer = new LocalPlayer(this.level);
-        this.camera = new Camera(this);
-        this.levelRenderer.rebuildAll();
-
-        levelUpdatePending = false;
-        currentScreen = null;
-    }
-
     boolean f2WasDown = false;
     boolean EscWasDown = false;
 
     private void tick() throws IOException {
-        info.tickKeys();
-        info.tickScroll();
-
         if (Keyboard.isKeyDown(Keyboard.KEY_F11)) {
             toggleFullscreen();
         }
 
         boolean escDown = Keyboard.isKeyDown(Keyboard.KEY_ESCAPE);
         if (escDown && !EscWasDown) {
-            if(pauseMenu.visible) {
+            if (pauseMenu.visible) {
                 pauseMenu.visible = false;
                 Mouse.setGrabbed(true);
+            } else if (chat.toggled) {
+                chat.setToggled(false);
             } else {
                 pauseMenu.visible = true;
                 Mouse.setGrabbed(false);
@@ -389,6 +362,15 @@ public class Minecraft implements Runnable {
         boolean f2Down = Keyboard.isKeyDown(Keyboard.KEY_F2);
         if (f2Down && !f2WasDown) screenshot();
         f2WasDown = f2Down;
+
+        if (pauseMenu.visible) {
+            while (Keyboard.next()) { /* drop */ }
+            while (Mouse.next())    { /* drop */ }
+            return;
+        }
+
+        info.tickKeys();
+        info.tickScroll();
 
         int[] update;
         while ((update = SocketClient.pendingBlocks.poll()) != null) {
@@ -419,7 +401,7 @@ public class Minecraft implements Runnable {
             }
             width = Display.getWidth();
             height = Display.getHeight();
-            glViewport(0, 0, width, height);
+            GL.viewport(0, 0, width, height);
         } catch (LWJGLException e) {
             e.printStackTrace();
         }
@@ -427,8 +409,8 @@ public class Minecraft implements Runnable {
 
     private void pick(float pt) {
         selectBuffer.clear();
-        glSelectBuffer(selectBuffer);
-        glRenderMode(GL_SELECT);
+        GL.selectBuffer(selectBuffer);
+        GL.renderMode(GL.SELECT);
         camera.setupPick(pt, width / 2, height / 2);
         levelRenderer.pick(localPlayer);
         selectBuffer.flip();
@@ -438,7 +420,7 @@ public class Minecraft implements Runnable {
         int[] names = new int[10];
         int hitNameCount = 0;
 
-        int hits = glRenderMode(GL_RENDER);
+        int hits = GL.renderMode(GL.RENDER);
         for (int hi = 0; hi < hits; hi++) {
             int nameCount = selectBuffer.get();
             long minZ = selectBuffer.get();
@@ -457,18 +439,14 @@ public class Minecraft implements Runnable {
 
     private void render(float pt) throws IOException {
         float[] skyRgb  = WorldTime.skyColor();
-        float[] fogRgb  = WorldTime.fogColor();
         float[] sun     = WorldTime.sunDirection();
         float[] ambient = WorldTime.ambientLight();
         float[] diffuse = WorldTime.diffuseLight();
 
-        glClearColor(skyRgb[0], skyRgb[1], skyRgb[2], 1f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        GL.clearColor(skyRgb[0], skyRgb[1], skyRgb[2], 1f);
+        GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-        fogColor.clear();
-        fogColor.put(fogRgb[0]).put(fogRgb[1]).put(fogRgb[2]).put(1f).flip();
-
-        boolean worldReady = (levelReady || !levelUpdatePending)
+        boolean worldReady = levelReady
                 && level != null && levelRenderer != null && localPlayer != null
                 && level.hasAnyChunk();
 
@@ -476,6 +454,8 @@ public class Minecraft implements Runnable {
             pick(pt);
 
             while (Mouse.next()) {
+                if (pauseMenu.visible) continue;
+
                 if (Mouse.isGrabbed() && !chat.toggled) {
                     localPlayer.turn(Mouse.getEventDX(), Mouse.getEventDY());
                 }
@@ -510,49 +490,42 @@ public class Minecraft implements Runnable {
 
             skyRenderer.render();
 
+            float gamma = Settings.gammaMultiplier();
+
             sunPosBuf.clear();
             sunPosBuf.put(sun[0]).put(sun[1]).put(sun[2]).put(0f).flip();
-            glLight(GL_LIGHT0, GL_POSITION, sunPosBuf);
+            GL.light(GL.LIGHT0, GL.POSITION, sunPosBuf);
 
             ambientBuf.clear();
-            ambientBuf.put(ambient[0]).put(ambient[1]).put(ambient[2]).put(1f).flip();
-            glLight(GL_LIGHT0, GL_AMBIENT, ambientBuf);
+            ambientBuf.put(ambient[0] * gamma).put(ambient[1] * gamma).put(ambient[2] * gamma).put(1f).flip();
+            GL.light(GL.LIGHT0, GL.AMBIENT, ambientBuf);
 
             diffuseBuf.clear();
-            diffuseBuf.put(diffuse[0]).put(diffuse[1]).put(diffuse[2]).put(1f).flip();
-            glLight(GL_LIGHT0, GL_DIFFUSE, diffuseBuf);
+            diffuseBuf.put(diffuse[0] * gamma).put(diffuse[1] * gamma).put(diffuse[2] * gamma).put(1f).flip();
+            GL.light(GL.LIGHT0, GL.DIFFUSE, diffuseBuf);
 
-            glEnable(GL_FOG);
-            glFogi(GL_FOG_MODE, GL_LINEAR);
-            glFogf(GL_FOG_START, 60);
-            glFogf(GL_FOG_END, 120);
-            glFog(GL_FOG_COLOR, fogColor);
-            glDisable(GL_FOG);
-
-            glEnable(GL_LIGHTING);
-            glEnable(GL_LIGHT0);
-            glEnable(GL_COLOR_MATERIAL);
+            GL.enable(GL.LIGHTING);
+            GL.enable(GL.LIGHT0);
+            GL.enable(GL.COLOR_MATERIAL);
 
             levelRenderer.render(0);
-            glEnable(GL_FOG);
             levelRenderer.render(1);
             levelRenderer.renderTntOverlay();
 
-            glDisable(GL_COLOR_MATERIAL);
-            glDisable(GL_LIGHT0);
-            glDisable(GL_LIGHTING);
-            glColor4f(1f, 1f, 1f, 1f);
+            GL.disable(GL.COLOR_MATERIAL);
+            GL.disable(GL.LIGHT0);
+            GL.disable(GL.LIGHTING);
+            GL.color4f(1f, 1f, 1f, 1f);
 
             levelRenderer.renderPlayers(playerManager);
             if (camera.mode != Camera.FIRST) {
                 levelRenderer.renderSelf(localPlayer, playerManager);
             }
             levelRenderer.renderNameTags(playerManager, localPlayer, font);
-            glDisable(GL_TEXTURE_2D);
+            GL.disable(GL.TEXTURE_2D);
 
             if (hitResult != null) levelRenderer.renderHit(hitResult);
 
-            glDisable(GL_FOG);
             crosshair.render(width, height);
             info.render(width, height);
             pauseMenu.render(font, width, height);
@@ -569,7 +542,7 @@ public class Minecraft implements Runnable {
     private void screenshot() {
         try {
             ByteBuffer buf = BufferUtils.createByteBuffer(width * height * 4);
-            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            GL.readPixels(0, 0, width, height, GL.RGBA, GL.UNSIGNED_BYTE, buf);
             BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {

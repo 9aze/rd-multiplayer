@@ -1,28 +1,21 @@
 package client.level;
 
+import client.gfx.GL;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
 
-import static org.lwjgl.opengl.GL11.*;
-
-public class Tessellator {
-
+public class Tessellator implements VertexSink {
     private static final int MAX_VERTICES = 100000;
-
     private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(MAX_VERTICES * 3);
     private final FloatBuffer textureCoordinateBuffer = BufferUtils.createFloatBuffer(MAX_VERTICES * 2);
     private final FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(MAX_VERTICES * 3);
     private final FloatBuffer normalBuffer = BufferUtils.createFloatBuffer(MAX_VERTICES * 3);
-
     private int vertices = 0;
-
     private boolean hasTexture = false;
     private float textureU, textureV;
-
     private boolean hasColor = false;
     private float red, green, blue;
-
     private boolean hasNormal = false;
     private float normalX, normalY, normalZ;
 
@@ -30,11 +23,11 @@ public class Tessellator {
         clear();
     }
 
+    @Override
     public void vertex(float x, float y, float z) {
         vertexBuffer.put(vertices * 3,     x);
         vertexBuffer.put(vertices * 3 + 1, y);
         vertexBuffer.put(vertices * 3 + 2, z);
-
         if (hasTexture) {
             textureCoordinateBuffer.put(vertices * 2,     textureU);
             textureCoordinateBuffer.put(vertices * 2 + 1, textureV);
@@ -49,17 +42,18 @@ public class Tessellator {
             normalBuffer.put(vertices * 3 + 1, normalY);
             normalBuffer.put(vertices * 3 + 2, normalZ);
         }
-
         vertices++;
         if (vertices == MAX_VERTICES) flush();
     }
 
+    @Override
     public void texture(float u, float v) {
         hasTexture = true;
         textureU = u;
         textureV = v;
     }
 
+    @Override
     public void color(float r, float g, float b) {
         hasColor = true;
         red = r;
@@ -67,6 +61,7 @@ public class Tessellator {
         blue = b;
     }
 
+    @Override
     public void normal(float nx, float ny, float nz) {
         hasNormal = true;
         normalX = nx;
@@ -79,24 +74,19 @@ public class Tessellator {
         textureCoordinateBuffer.flip();
         colorBuffer.flip();
         normalBuffer.flip();
-
-        glVertexPointer(3, 0, vertexBuffer);
-        if (hasTexture) glTexCoordPointer(2, 0, textureCoordinateBuffer);
-        if (hasColor)   glColorPointer(3, 0, colorBuffer);
-        if (hasNormal)  glNormalPointer(0, normalBuffer);
-
-        glEnableClientState(GL_VERTEX_ARRAY);
-        if (hasTexture) glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        if (hasColor)   glEnableClientState(GL_COLOR_ARRAY);
-        if (hasNormal)  glEnableClientState(GL_NORMAL_ARRAY);
-
-        glDrawArrays(GL_QUADS, 0, vertices);
-
-        glDisableClientState(GL_VERTEX_ARRAY);
-        if (hasTexture) glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        if (hasColor)   glDisableClientState(GL_COLOR_ARRAY);
-        if (hasNormal)  glDisableClientState(GL_NORMAL_ARRAY);
-
+        GL.vertexPointer(3, 0, vertexBuffer);
+        if (hasTexture) GL.texCoordPointer(2, 0, textureCoordinateBuffer);
+        if (hasColor)   GL.colorPointer(3, 0, colorBuffer);
+        if (hasNormal)  GL.normalPointer(0, normalBuffer);
+        GL.enableClientState(GL.VERTEX_ARRAY);
+        if (hasTexture) GL.enableClientState(GL.TEXTURE_COORD_ARRAY);
+        if (hasColor)   GL.enableClientState(GL.COLOR_ARRAY);
+        if (hasNormal)  GL.enableClientState(GL.NORMAL_ARRAY);
+        GL.drawArrays(GL.QUADS, 0, vertices);
+        GL.disableClientState(GL.VERTEX_ARRAY);
+        if (hasTexture) GL.disableClientState(GL.TEXTURE_COORD_ARRAY);
+        if (hasColor)   GL.disableClientState(GL.COLOR_ARRAY);
+        if (hasNormal)  GL.disableClientState(GL.NORMAL_ARRAY);
         clear();
     }
 
@@ -105,7 +95,6 @@ public class Tessellator {
         textureCoordinateBuffer.clear();
         colorBuffer.clear();
         normalBuffer.clear();
-
         vertices = 0;
         hasTexture = false;
         hasColor = false;

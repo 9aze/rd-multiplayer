@@ -8,7 +8,7 @@ import server.client.ChunkTracker;
 
 public class Broadcaster {
 
-    private static final double VISIBILITY_RANGE = ChunkTracker.RENDER_DISTANCE * 16;
+    private static final double VISIBILITY_RANGE = ChunkTracker.MAX_RENDER_DISTANCE * 16;
 
     private static boolean inRange(Client a, Client b) {
         double[] posA = a.getLastPos();

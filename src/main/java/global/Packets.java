@@ -19,4 +19,5 @@ public final class Packets {
     public static final byte AUTH_TOKEN    = 17;
     public static final byte TIME_OF_DAY   = 18;
     public static final byte PING_INFO     = 19;
+    public static final byte CLIENT_RENDER_DISTANCE = 20;
 }

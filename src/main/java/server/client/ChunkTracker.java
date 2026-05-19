@@ -14,92 +14,111 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class ChunkTracker {
-
-    public static final int RENDER_DISTANCE = Server.RENDER_DISTANCE;
+    public static final int MAX_RENDER_DISTANCE = Server.RENDER_DISTANCE;
+    public static final int VERTICAL_RENDER_DISTANCE = Server.VERTICAL_RENDER_DISTANCE;
     private static final int CHUNK_SIZE = LevelChunk.CHUNK_SIZE;
 
+    private int renderDistance = Server.RENDER_DISTANCE;
+
+    public void setRenderDistance(int chunks) {
+        if (chunks < 2) chunks = 2;
+        if (chunks > MAX_RENDER_DISTANCE) chunks = MAX_RENDER_DISTANCE;
+        this.renderDistance = chunks;
+    }
 
     private static final ConcurrentHashMap<Long, AtomicInteger> refCounts =
             new ConcurrentHashMap<>();
 
-    private static void addRef(int cx, int cz) {
-        refCounts.computeIfAbsent(pack(cx, cz), k -> new AtomicInteger(0))
+    private static void addRef(int cx, int cy, int cz) {
+        refCounts.computeIfAbsent(pack(cx, cy, cz), k -> new AtomicInteger(0))
                  .incrementAndGet();
     }
 
-    private static void releaseRef(int cx, int cz) {
-        long key = pack(cx, cz);
+    private static void releaseRef(int cx, int cy, int cz) {
+        long key = pack(cx, cy, cz);
         AtomicInteger count = refCounts.get(key);
         if (count != null && count.decrementAndGet() <= 0) {
             refCounts.remove(key);
-            Server.level.unloadChunk(cx, cz);
+            Server.level.unloadChunk(cx, cy, cz);
         }
     }
 
-
     private final Set<Long> sentChunks = new HashSet<>();
 
-    public void update(double worldX, double worldZ, DataOutputStream out) throws IOException {
+    public void update(double worldX, double worldY, double worldZ, DataOutputStream out) throws IOException {
         Level level = Server.level;
 
-        int playerCX = (int) Math.floor(worldX / CHUNK_SIZE);
-        int playerCZ = (int) Math.floor(worldZ / CHUNK_SIZE);
+        int playerCX = Math.floorDiv((int) Math.floor(worldX), CHUNK_SIZE);
+        int playerCY = Math.floorDiv((int) Math.floor(worldY), CHUNK_SIZE);
+        int playerCZ = Math.floorDiv((int) Math.floor(worldZ), CHUNK_SIZE);
 
-        int minCX = playerCX - RENDER_DISTANCE;
-        int maxCX = playerCX + RENDER_DISTANCE;
-        int minCZ = playerCZ - RENDER_DISTANCE;
-        int maxCZ = playerCZ + RENDER_DISTANCE;
+        int minCX = playerCX - renderDistance;
+        int maxCX = playerCX + renderDistance;
+        int minCY = playerCY - VERTICAL_RENDER_DISTANCE;
+        int maxCY = playerCY + VERTICAL_RENDER_DISTANCE;
+        int minCZ = playerCZ - renderDistance;
+        int maxCZ = playerCZ + renderDistance;
 
+        // unload chunks now out of range.
         Set<Long> toRemove = new HashSet<>();
         for (long key : sentChunks) {
-            int cx = unpackX(key);
-            int cz = unpackZ(key);
-            if (cx < minCX || cx > maxCX || cz < minCZ || cz > maxCZ) {
+            int cx = unpackX(key), cy = unpackY(key), cz = unpackZ(key);
+            if (cx < minCX || cx > maxCX || cy < minCY || cy > maxCY || cz < minCZ || cz > maxCZ) {
                 out.writeByte(Packets.CHUNK_UNLOAD);
                 out.writeInt(cx);
+                out.writeInt(cy);
                 out.writeInt(cz);
                 toRemove.add(key);
-                releaseRef(cx, cz);
+                releaseRef(cx, cy, cz);
             }
         }
         sentChunks.removeAll(toRemove);
 
+        // load any new chunks now in range.
         for (int cx = minCX; cx <= maxCX; cx++) {
-            for (int cz = minCZ; cz <= maxCZ; cz++) {
-                long key = pack(cx, cz);
-                if (!sentChunks.contains(key)) {
-                    writeChunk(out, level, cx, cz);
-                    sentChunks.add(key);
-                    addRef(cx, cz);
+            for (int cy = minCY; cy <= maxCY; cy++) {
+                for (int cz = minCZ; cz <= maxCZ; cz++) {
+                    long key = pack(cx, cy, cz);
+                    if (!sentChunks.contains(key)) {
+                        writeChunk(out, level, cx, cy, cz);
+                        sentChunks.add(key);
+                        addRef(cx, cy, cz);
+                    }
                 }
             }
         }
     }
 
-    public boolean hasChunk(int cx, int cz) {
-        return sentChunks.contains(pack(cx, cz));
+    public boolean hasChunk(int cx, int cy, int cz) {
+        return sentChunks.contains(pack(cx, cy, cz));
     }
 
     public void clear() {
         for (long key : sentChunks) {
-            releaseRef(unpackX(key), unpackZ(key));
+            releaseRef(unpackX(key), unpackY(key), unpackZ(key));
         }
         sentChunks.clear();
     }
 
-    private static void writeChunk(DataOutputStream out, Level level, int cx, int cz) throws IOException {
-        byte[] data = level.getChunkBlocks(cx, cz);
+    private static void writeChunk(DataOutputStream out, Level level, int cx, int cy, int cz) throws IOException {
+        byte[] data = level.getChunkBlocks(cx, cy, cz);
         out.writeByte(Packets.CHUNK_DATA);
         out.writeInt(cx);
+        out.writeInt(cy);
         out.writeInt(cz);
-        out.writeInt(level.getDepth());
-        out.writeInt(data.length);
-        out.write(data);
+        out.write(data); // 4096 bytes (16x16x16)
     }
 
-    private static long pack(int cx, int cz) {
-        return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
+    private static long pack(int cx, int cy, int cz) {
+        return ((long)(cx & 0x1FFFFF) << 42)
+             | ((long)(cy & 0x1FFFFF) << 21)
+             |  (long)(cz & 0x1FFFFF);
     }
-    private static int unpackX(long key) { return (int)(key >> 32); }
-    private static int unpackZ(long key) { return (int)(key & 0xFFFFFFFFL); }
+    private static int signExtend21(long v) {
+        long m = v & 0x1FFFFF;
+        return (int)((m & 0x100000L) != 0 ? m | ~0x1FFFFFL : m);
+    }
+    private static int unpackX(long key) { return signExtend21((key >> 42) & 0x1FFFFF); }
+    private static int unpackY(long key) { return signExtend21((key >> 21) & 0x1FFFFF); }
+    private static int unpackZ(long key) { return signExtend21( key        & 0x1FFFFF); }
 }

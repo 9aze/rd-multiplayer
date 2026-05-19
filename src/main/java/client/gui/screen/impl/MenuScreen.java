@@ -231,6 +231,9 @@ public class MenuScreen extends Screen {
         if (label.equals("Play")) {
             Minecraft.mc.setScreen(new ServerSelectScreen());
         }
+        if (label.equals("Options")) {
+            Minecraft.mc.setScreen(new OptionsScreen());
+        }
         if (label.equals("Quit")) {
             Display.destroy();
             System.exit(0);

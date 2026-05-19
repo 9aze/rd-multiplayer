@@ -36,6 +36,7 @@ public class LocalPlayer {
     private boolean flying = false;
     private long lastSpacePress = 0L;
     private static final long DOUBLE_SPACE_TIME = 300L;
+    private static final float FALLBACK_SPAWN_Y = 80f;
 
     public LocalPlayer(Level level) {
         this.level = level;
@@ -64,7 +65,7 @@ public class LocalPlayer {
             z = (float) Minecraft.mc.spawnZ;
         } else {
             x = 128.0F;
-            y = (float) (this.level.depth + 3);
+            y = FALLBACK_SPAWN_Y;
             z = 128.0F;
         }
         setPosition(x, y, z);
