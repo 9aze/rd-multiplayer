@@ -9,7 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.jar.JarFile;
@@ -81,6 +84,8 @@ public final class ModLoader {
         }
 
         ModContextImpl ctx = new ModContextImpl(m.id);
+        registerServiceCommands(cl, m.id);
+
         try {
             instance.onEnable(ctx);
         } catch (Throwable t) {
@@ -91,6 +96,42 @@ public final class ModLoader {
 
         ModRegistry.get().track(new ModRegistry.LoadedMod(m.id, m.name, m.version, instance));
         System.out.println("Mod loaded: " + m.name + " (" + m.id + " v" + m.version + ")");
+    }
+
+    private static void registerServiceCommands(ClassLoader cl, String modId) {
+        ServiceLoader<ChatCommandProvider> loader;
+        try {
+            loader = ServiceLoader.load(ChatCommandProvider.class, cl);
+        } catch (Throwable t) {
+            System.err.println("Mod " + modId + ": ServiceLoader init failed: " + t);
+            return;
+        }
+        Iterator<ChatCommandProvider> it = loader.iterator();
+        while (true) {
+            ChatCommandProvider provider;
+            try {
+                if (!it.hasNext()) break;
+                provider = it.next();
+            } catch (ServiceConfigurationError e) {
+                System.err.println("Mod " + modId + ": skipping a ChatCommandProvider entry: " + e.getMessage());
+                continue;
+            } catch (Throwable t) {
+                System.err.println("Mod " + modId + ": ServiceLoader iteration failed: " + t);
+                break;
+            }
+            String name;
+            try { name = provider.name(); }
+            catch (Throwable t) {
+                System.err.println("Mod " + modId + ": provider " + provider.getClass().getName() + " name() threw, skipping: " + t);
+                continue;
+            }
+            if (name == null || name.isEmpty()) {
+                System.err.println("Mod " + modId + ": provider " + provider.getClass().getName() + " returned null/empty name, skipping");
+                continue;
+            }
+            ModRegistry.get().registerCommand(name, provider);
+            System.out.println("Mod " + modId + ": auto-registered /" + name + " from " + provider.getClass().getName());
+        }
     }
 
     private static Manifest readManifest(Path jar) {
@@ -145,11 +186,16 @@ public final class ModLoader {
 
         @Override public String modId() { return id; }
 
+        @Override public client.FontRenderer font() {
+            client.Minecraft mc = client.Minecraft.mc;
+            return mc == null ? null : mc.font;
+        }
+
         @Override public void registerCommand(String name, ChatCommand h) {
             ModRegistry.get().registerCommand(name, h);
         }
         @Override public void registerHud(HudRenderer r) { ModRegistry.get().registerHud(r); }
-        @Override public void registerTick(Runnable r) { ModRegistry.get().registerTick(r); }
+        @Override public void registerTick(Runnable r)   { ModRegistry.get().registerTick(r); }
         @Override public void registerKeybind(int key, Runnable r) { ModRegistry.get().registerKeybind(key, r); }
         @Override public <E extends ModEvent> void addListener(Class<E> type, Consumer<E> listener) {
             ModRegistry.get().addListener(type, listener);

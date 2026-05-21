@@ -77,7 +77,7 @@ public class Minecraft implements Runnable {
 
     public volatile boolean disconnectPending = false;
 
-    private FontRenderer font;
+    public FontRenderer font;
     private Font minecraftFont;
     public Chat chat;
     public SocketClient socket;
@@ -236,6 +236,7 @@ public class Minecraft implements Runnable {
             JOptionPane.showMessageDialog(null, e, "Failed to start Minecraft", JOptionPane.ERROR_MESSAGE);
             System.exit(0);
         }
+
         client.mods.ModLoader.loadAll();
 
         if (currentScreen == null) currentScreen = new MenuScreen();
@@ -267,6 +268,7 @@ public class Minecraft implements Runnable {
                 currentScreen = null;
                 Mouse.setGrabbed(true);
             }
+
             startKeepAlive(socket);
 
             int frames = 0;
@@ -356,7 +358,6 @@ public class Minecraft implements Runnable {
             }
         }
         if (localPlayer != null && socket != null && socket.isConnected()) localPlayer.tick();
-
         client.mods.ModRegistry.get().dispatchTick();
         if (!chat.toggled && currentScreen == null) {
             dispatchModKeybinds();
@@ -365,7 +366,6 @@ public class Minecraft implements Runnable {
 
     private void dispatchModKeybinds() {
         client.mods.ModRegistry reg = client.mods.ModRegistry.get();
-
         java.util.Set<Integer> nowDown = new java.util.HashSet<>();
         for (Integer key : modKeybindKeys()) {
             if (Keyboard.isKeyDown(key)) {

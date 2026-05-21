@@ -5,10 +5,12 @@ import java.util.function.Consumer;
 public interface ModContext {
     String modId();
 
-    // chat
+    client.FontRenderer font();
+
+    // chat    
     // registers a / (slash) command
     void registerCommand(String name, ChatCommand handler);
-    // prints to client-side chat only
+    // prints to client-side chat
     void chatLocal(String message);
 
     // HUD
