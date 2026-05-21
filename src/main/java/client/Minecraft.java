@@ -144,7 +144,7 @@ public class Minecraft implements Runnable {
     public void connect(String ip, int port, String username) {
         this.username = username;
         this.socket = new SocketClient(ip, port, username);
-        this.socketThread = new Thread(socket);
+        this.socketThread = new Thread(socket, "SocketClient");
         this.playerManager = new PlayerManager();
         this.level = new Level();
 
@@ -236,101 +236,78 @@ public class Minecraft implements Runnable {
             System.exit(0);
         }
 
-        if(!(currentScreen instanceof LoadingScreen) && !levelReady) {
-            currentScreen = new MenuScreen();
-            GL.clearColor(0, 0, 0, 1);
-            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-            currentScreen.render(font, width, height);
-            Display.update();
-        }
+        if (currentScreen == null) currentScreen = new MenuScreen();
 
-        while (!levelReady) {
-            if (Display.isCloseRequested()) destroy();
-            if (Display.wasResized()) {
-                width = Display.getWidth();
-                height = Display.getHeight();
-                if (height <= 0) height = 1;
-                GL.viewport(0, 0, width, height);
-            }
-            GL.clearColor(0, 0, 0, 1);
-            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-            currentScreen.render(font, width, height);
-            Display.update();
-            try { Thread.sleep(16); } catch (InterruptedException ignored) {}
-        }
+        while (!Display.isCloseRequested()) {
 
-        if (levelRenderer == null) {
-            levelRenderer = new LevelRenderer(level);
-            localPlayer = new LocalPlayer(level);
-            camera = new Camera(this);
-            level.forEachLoadedChunk((cx, cy, cz) -> levelRenderer.chunkLoaded(cx, cy, cz));
-            currentScreen = null;
-
-            Mouse.setGrabbed(true);
-        }
-
-        keepAlive();
-
-        int frames = 0;
-        long lastTime = System.currentTimeMillis();
-
-        try {
-            while (!Display.isCloseRequested()) {
+            while (!Display.isCloseRequested() && !levelReady) {
                 if (disconnectPending) {
-                    if(!(Minecraft.mc.currentScreen instanceof LoadingScreen)) {
-                        Minecraft.mc.applyDisconnect();
-                    }
-                    runMenuLoop();
-                    return;
+                    applyDisconnect();
                 }
-
                 if (Display.wasResized()) {
                     width = Display.getWidth();
                     height = Display.getHeight();
                     if (height <= 0) height = 1;
                     GL.viewport(0, 0, width, height);
                 }
-
-                timer.advanceTime();
-                for (int i = 0; i < timer.ticks; i++) tick();
-                render(timer.partialTicks);
-
-                boolean shouldGrab = !chat.toggled;
-                if (shouldGrab != lastGrabbed) {
-                    Mouse.setGrabbed(shouldGrab);
-                    if (shouldGrab) while (Mouse.next()) {}
-                    lastGrabbed = shouldGrab;
-                }
-
-                frames++;
-                while (System.currentTimeMillis() >= lastTime + 1000L) {
-                    fps = frames;
-                    Chunk.updates = 0;
-                    lastTime += 1000L;
-                    frames = 0;
-                }
+                GL.clearColor(0, 0, 0, 1);
+                GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+                if (currentScreen != null) currentScreen.render(font, width, height);
+                Display.update();
+                try { Thread.sleep(16); } catch (InterruptedException ignored) {}
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            destroy();
-        }
-    }
+            if (Display.isCloseRequested()) break;
 
-    private void runMenuLoop() {
-        while (!Display.isCloseRequested()) {
-            if (Display.wasResized()) {
-                width = Display.getWidth();
-                height = Display.getHeight();
-                if (height <= 0) height = 1;
-                GL.viewport(0, 0, width, height);
+            if (levelRenderer == null) {
+                levelRenderer = new LevelRenderer(level);
+                localPlayer = new LocalPlayer(level);
+                camera = new Camera(this);
+                level.forEachLoadedChunk((cx, cy, cz) -> levelRenderer.chunkLoaded(cx, cy, cz));
+                currentScreen = null;
+                Mouse.setGrabbed(true);
             }
-            GL.clearColor(0, 0, 0, 1);
-            GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-            currentScreen.render(font, width, height);
-            Display.update();
-            try { Thread.sleep(16); } catch (InterruptedException ignored) {}
+
+            startKeepAlive(socket);
+
+            int frames = 0;
+            long lastTime = System.currentTimeMillis();
+            try {
+                while (!Display.isCloseRequested() && !disconnectPending) {
+                    if (Display.wasResized()) {
+                        width = Display.getWidth();
+                        height = Display.getHeight();
+                        if (height <= 0) height = 1;
+                        GL.viewport(0, 0, width, height);
+                    }
+
+                    timer.advanceTime();
+                    for (int i = 0; i < timer.ticks; i++) tick();
+                    render(timer.partialTicks);
+
+                    boolean shouldGrab = !chat.toggled;
+                    if (shouldGrab != lastGrabbed) {
+                        Mouse.setGrabbed(shouldGrab);
+                        if (shouldGrab) while (Mouse.next()) {}
+                        lastGrabbed = shouldGrab;
+                    }
+
+                    frames++;
+                    while (System.currentTimeMillis() >= lastTime + 1000L) {
+                        fps = frames;
+                        Chunk.updates = 0;
+                        lastTime += 1000L;
+                        frames = 0;
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                disconnectPending = true;
+            }
+            if (Display.isCloseRequested()) break;
+
+            applyDisconnect();
         }
+
         destroy();
     }
 
@@ -370,8 +347,11 @@ public class Minecraft implements Runnable {
         info.tickScroll();
 
         int[] update;
-        while ((update = SocketClient.pendingBlocks.poll()) != null) {
-            if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
+        SocketClient s = socket;
+        if (s != null) {
+            while ((update = s.pendingBlocks.poll()) != null) {
+                if (level != null) level.setTile(update[0], update[1], update[2], update[3]);
+            }
         }
         if (localPlayer != null && socket != null && socket.isConnected()) localPlayer.tick();
     }
@@ -562,21 +542,29 @@ public class Minecraft implements Runnable {
         }
     }
 
-    private void keepAlive() {
+    private void keepAlive(final SocketClient session) {
+        if (session == null) return;
         Thread t = new Thread(() -> {
             while (true) {
                 try {
-                    if (socket.isConnected()) SocketClient.sendKeepalive(System.currentTimeMillis());
+                    if (Minecraft.mc.socket != session) return;
+                    if (!session.isConnected() || !session.authenticated) return;
+                    SocketClient.sendKeepalive(System.currentTimeMillis());
                     Thread.sleep(5000);
                 } catch (InterruptedException e) {
-                    break;
+                    return;
                 } catch (IOException e) {
                     e.printStackTrace();
+                    return;
                 }
             }
         }, "KeepAliveThread");
         t.setDaemon(true);
         t.start();
+    }
+
+    private void startKeepAlive(SocketClient session) {
+        keepAlive(session);
     }
 
     public void setScreen(Screen screen) {this.currentScreen = screen;}

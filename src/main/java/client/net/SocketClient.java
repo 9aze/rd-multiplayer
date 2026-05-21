@@ -20,13 +20,12 @@ public class SocketClient implements Runnable {
     /** Identifier used in the .auth file ("host:port"). */
     private final String serverId;
     private Socket socket;
-    private static DataOutputStream out;
+    private DataOutputStream out;
     private DataInputStream in;
-    public boolean authenticated;
-
-    public static final ConcurrentLinkedQueue<int[]> pendingBlocks = new ConcurrentLinkedQueue<>();
-
-    private static final Object writeLock = new Object();
+    public volatile boolean authenticated;
+    private volatile boolean running = true;
+    public final ConcurrentLinkedQueue<int[]> pendingBlocks = new ConcurrentLinkedQueue<>();
+    private final Object writeLock = new Object();
 
     public SocketClient(String host, int port, String username) {
         this.host = host;
@@ -57,10 +56,12 @@ public class SocketClient implements Runnable {
             String storedToken = AuthStore.getToken(serverId, username);
             if (storedToken == null) storedToken = "";
 
-            out.writeByte(Packets.AUTH_REQUEST);
-            out.writeUTF(username);
-            out.writeUTF(storedToken);
-            out.flush();
+            synchronized (writeLock) {
+                out.writeByte(Packets.AUTH_REQUEST);
+                out.writeUTF(username);
+                out.writeUTF(storedToken);
+                out.flush();
+            }
 
             setLoading("Sending authentication request...", Color.WHITE);
 
@@ -73,7 +74,7 @@ public class SocketClient implements Runnable {
                     setLoading("Auth failed: " + reason, Color.RED);
                 }
                 System.err.println("Authentication failed!");
-                socket.close();
+                closeSocketQuietly();
                 return;
             }
 
@@ -86,13 +87,19 @@ public class SocketClient implements Runnable {
             sendRenderDistance(client.Settings.getRenderDistance());
 
             setLoading("Requesting level...", Color.WHITE);
-            out.writeByte(Packets.REQUEST_LEVEL);
-            out.flush();
+            synchronized (writeLock) {
+                out.writeByte(Packets.REQUEST_LEVEL);
+                out.flush();
+            }
 
             setLoading("Waiting for chunks...", Color.WHITE);
 
-            while (true) {
+            while (running) {
                 byte packetId = in.readByte();
+                if (!running) break;
+
+                Minecraft mc = Minecraft.mc;
+                if (mc == null) break;
 
                 switch (packetId) {
 
@@ -109,10 +116,10 @@ public class SocketClient implements Runnable {
                         int cz = in.readInt();
                         byte[] data = new byte[16 * 16 * 16];
                         in.readFully(data);
-                        Level level = Minecraft.mc.level;
+                        Level level = mc.level;
                         if (level != null) {
                             level.loadChunk(cx, cy, cz, data);
-                            if (!Minecraft.mc.levelReady) Minecraft.mc.levelReady = true;
+                            if (!mc.levelReady) mc.levelReady = true;
                         }
                         break;
                     }
@@ -121,7 +128,7 @@ public class SocketClient implements Runnable {
                         int cx = in.readInt();
                         int cy = in.readInt();
                         int cz = in.readInt();
-                        Level level = Minecraft.mc.level;
+                        Level level = mc.level;
                         if (level != null) level.unloadChunk(cx, cy, cz);
                         break;
                     }
@@ -141,11 +148,11 @@ public class SocketClient implements Runnable {
 
                     case Packets.SET_POS: {
                         double x = in.readDouble(), y = in.readDouble(), z = in.readDouble();
-                        Minecraft.mc.spawnX = x;
-                        Minecraft.mc.spawnY = y;
-                        Minecraft.mc.spawnZ = z;
-                        Minecraft.mc.spawnReceived = true;
-                        if (Minecraft.mc.localPlayer != null) Minecraft.mc.localPlayer.forcePosition(x, y, z);
+                        mc.spawnX = x;
+                        mc.spawnY = y;
+                        mc.spawnZ = z;
+                        mc.spawnReceived = true;
+                        if (mc.localPlayer != null) mc.localPlayer.forcePosition(x, y, z);
                         break;
                     }
 
@@ -154,21 +161,23 @@ public class SocketClient implements Runnable {
                         double x = in.readDouble(), y = in.readDouble(), z = in.readDouble();
                         float yaw = in.readFloat();
                         float pitch = in.readFloat();
-                        Minecraft.mc.getPlayerManager().updatePlayer(uname, x, y, z, yaw, pitch);
+                        client.player.remote.PlayerManager pm = mc.getPlayerManager();
+                        if (pm != null) pm.updatePlayer(uname, x, y, z, yaw, pitch);
                         break;
                     }
 
                     case Packets.PING_INFO: {
                         String uname = in.readUTF();
                         int pingMs = in.readInt();
-                        Minecraft.mc.getPlayerManager().updatePing(uname, pingMs);
+                        client.player.remote.PlayerManager pm = mc.getPlayerManager();
+                        if (pm != null) pm.updatePing(uname, pingMs);
                         break;
                     }
 
                     case Packets.CHAT: {
                         String author  = in.readUTF();
                         String message = in.readUTF();
-                        Minecraft.mc.chat.addMessage(author, message);
+                        if (mc.chat != null) mc.chat.addMessage(author, message);
                         break;
                     }
 
@@ -176,9 +185,9 @@ public class SocketClient implements Runnable {
                         long time = in.readLong();
                         boolean isResponse = in.readBoolean();
                         if (isResponse) {
-                            Minecraft.mc.rtt = System.currentTimeMillis() - time;
+                            mc.rtt = System.currentTimeMillis() - time;
                         } else {
-                            SocketClient.sendKeepaliveResponse(time);
+                            sendKeepaliveResponse(time);
                         }
                         break;
                     }
@@ -186,11 +195,12 @@ public class SocketClient implements Runnable {
                     case Packets.CONNECTION: {
                         int type  = in.readInt();
                         String uname = in.readUTF();
-                        Minecraft.mc.chat.addConnectionMessage(uname, type);
+                        if (mc.chat != null) mc.chat.addConnectionMessage(uname, type);
                         if (type == 1) {
-                            Minecraft.mc.getPlayerManager().removePlayer(uname);
+                            client.player.remote.PlayerManager pm = mc.getPlayerManager();
+                            if (pm != null) pm.removePlayer(uname);
                         } else {
-                            if (Minecraft.mc.localPlayer != null) Minecraft.mc.localPlayer.sendPosition();
+                            if (mc.localPlayer != null) mc.localPlayer.sendPosition();
                         }
                         break;
                     }
@@ -200,7 +210,8 @@ public class SocketClient implements Runnable {
                         int len = in.readInt();
                         byte[] png = new byte[len];
                         in.readFully(png);
-                        Minecraft.mc.getPlayerManager().setPendingSkin(uname, png);
+                        client.player.remote.PlayerManager pm = mc.getPlayerManager();
+                        if (pm != null) pm.setPendingSkin(uname, png);
                         break;
                     }
 
@@ -217,21 +228,48 @@ public class SocketClient implements Runnable {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
-            setLoading("Connection error: " + e.getMessage(), Color.RED);
-            if(!(Minecraft.mc.currentScreen instanceof LoadingScreen)) {
-                Minecraft.mc.disconnectPending = true;
+            if (running) {
+                e.printStackTrace();
+                setLoading("Connection error: " + e.getMessage(), Color.RED);
+                if(!(Minecraft.mc.currentScreen instanceof LoadingScreen)) {
+                    Minecraft.mc.disconnectPending = true;
+                }
             }
+        } catch (Throwable t) {
+            t.printStackTrace();
+            if (Minecraft.mc != null) Minecraft.mc.disconnectPending = true;
+        } finally {
+            authenticated = false;
+            closeSocketQuietly();
         }
     }
 
+    private void closeSocketQuietly() {
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        try {
+            synchronized (writeLock) {
+                if (out != null) out.close();
+            }
+        } catch (IOException ignored) {}
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+    }
+
+    private static SocketClient current() {
+        Minecraft mc = Minecraft.mc;
+        if (mc == null) return null;
+        SocketClient s = mc.socket;
+        if (s == null || !s.authenticated || s.out == null) return null;
+        return s;
+    }
 
     public static void sendBlock(int packet, int x, int y, int z, int blockId) throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(packet);
-            out.writeInt(x); out.writeInt(y); out.writeInt(z);
-            if (packet == Packets.BLOCK_PLACE) out.writeByte(blockId);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(packet);
+            s.out.writeInt(x); s.out.writeInt(y); s.out.writeInt(z);
+            if (packet == Packets.BLOCK_PLACE) s.out.writeByte(blockId);
+            s.out.flush();
         }
     }
 
@@ -241,74 +279,78 @@ public class SocketClient implements Runnable {
 
     public static void sendPos(int packet, double x, double y, double z, float yaw, float pitch, int ping)
             throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(packet);
-            out.writeDouble(x); out.writeDouble(y); out.writeDouble(z);
-            out.writeFloat(yaw); out.writeFloat(pitch); out.writeInt(ping);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(packet);
+            s.out.writeDouble(x); s.out.writeDouble(y); s.out.writeDouble(z);
+            s.out.writeFloat(yaw); s.out.writeFloat(pitch); s.out.writeInt(ping);
+            s.out.flush();
         }
     }
 
     public static void sendKeepalive(long timestamp) throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(Packets.KEEPALIVE);
-            out.writeLong(timestamp);
-            out.writeBoolean(false);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(Packets.KEEPALIVE);
+            s.out.writeLong(timestamp);
+            s.out.writeBoolean(false);
+            s.out.flush();
         }
     }
 
     public static void sendRenderDistance(int chunks) {
-        if (out == null) return;
+        SocketClient s = current();
+        if (s == null) return;
         try {
-            synchronized (writeLock) {
-                out.writeByte(Packets.CLIENT_RENDER_DISTANCE);
-                out.writeInt(chunks);
-                out.flush();
+            synchronized (s.writeLock) {
+                s.out.writeByte(Packets.CLIENT_RENDER_DISTANCE);
+                s.out.writeInt(chunks);
+                s.out.flush();
             }
         } catch (IOException e) {
             System.err.println("sendRenderDistance failed: " + e.getMessage());
         }
     }
 
-    public void disconnect() {
-        authenticated = false;
-        try {
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (IOException ignored) {}
-        try {
-            if (in != null) in.close();
-        } catch (IOException ignored) {}
-        try {
-            if (out != null) out.close();
-        } catch (IOException ignored) {}
-    }
-
     public static void sendKeepaliveResponse(long serverTimestamp) throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(Packets.KEEPALIVE);
-            out.writeLong(serverTimestamp);
-            out.writeBoolean(true);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(Packets.KEEPALIVE);
+            s.out.writeLong(serverTimestamp);
+            s.out.writeBoolean(true);
+            s.out.flush();
         }
     }
 
     public static void sendChat(String author, String message) throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(Packets.CHAT);
-            out.writeUTF(author);
-            out.writeUTF(message);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(Packets.CHAT);
+            s.out.writeUTF(author);
+            s.out.writeUTF(message);
+            s.out.flush();
         }
     }
 
     public static void sendSkin(byte[] png) throws IOException {
-        synchronized (writeLock) {
-            out.writeByte(Packets.SKIN_UPLOAD);
-            out.writeInt(png.length);
-            out.write(png);
-            out.flush();
+        SocketClient s = current();
+        if (s == null) return;
+        synchronized (s.writeLock) {
+            s.out.writeByte(Packets.SKIN_UPLOAD);
+            s.out.writeInt(png.length);
+            s.out.write(png);
+            s.out.flush();
         }
+    }
+
+    public void disconnect() {
+        running = false;
+        authenticated = false;
+        closeSocketQuietly();
     }
 
     private void uploadSkinIfPresent() {
