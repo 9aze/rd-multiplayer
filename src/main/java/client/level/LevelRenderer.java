@@ -26,6 +26,8 @@ public class LevelRenderer implements LevelListener {
     private final Set<Long> pendingLoad   = ConcurrentHashMap.newKeySet();
     private final Set<Long> pendingUnload = ConcurrentHashMap.newKeySet();
 
+    private final java.util.ArrayList<Chunk> sortedRender = new java.util.ArrayList<>();
+
     public LevelRenderer(Level level) {
         this.tessellator = new Tessellator();
         this.level = level;
@@ -78,7 +80,22 @@ public class LevelRenderer implements LevelListener {
         for (Chunk rc : renderChunks.values()) rc.setDirty();
     }
 
+    private int[] playerChunkCoords() {
+        LocalPlayer p = (Minecraft.mc == null) ? null : Minecraft.mc.localPlayer;
+        if (p == null) return null;
+        int pcx = Math.floorDiv((int) Math.floor(p.x), CHUNK_SIZE);
+        int pcy = Math.floorDiv((int) Math.floor(p.y), CHUNK_SIZE);
+        int pcz = Math.floorDiv((int) Math.floor(p.z), CHUNK_SIZE);
+        return new int[]{ pcx, pcy, pcz };
+    }
+
+    private static long chunkDistSq(int cx, int cy, int cz, int[] pc) {
+        long dx = cx - pc[0], dy = cy - pc[1], dz = cz - pc[2];
+        return dx * dx + dy * dy + dz * dz;
+    }
+
     private void applyPendingChunks() {
+        // unload chunks
         for (java.util.Iterator<Long> it = pendingUnload.iterator(); it.hasNext(); ) {
             long key = it.next();
             it.remove();
@@ -88,9 +105,17 @@ public class LevelRenderer implements LevelListener {
             markNeighborsDirty(cx, cy, cz);
         }
 
-        for (java.util.Iterator<Long> it = pendingLoad.iterator(); it.hasNext(); ) {
-            long key = it.next();
-            it.remove();
+        if (pendingLoad.isEmpty()) return;
+        int[] pc = playerChunkCoords();
+        java.util.ArrayList<Long> keys = new java.util.ArrayList<>(pendingLoad);
+        pendingLoad.clear();
+        if (pc != null) {
+            final int[] pcf = pc;
+            keys.sort((a, b) -> Long.compare(
+                chunkDistSq(rcCX(a), rcCY(a), rcCZ(a), pcf),
+                chunkDistSq(rcCX(b), rcCY(b), rcCZ(b), pcf)));
+        }
+        for (long key : keys) {
             int cx = rcCX(key), cy = rcCY(key), cz = rcCZ(key);
             createRenderChunk(cx, cy, cz);
             markNeighborsDirty(cx, cy, cz);
@@ -163,12 +188,26 @@ public class LevelRenderer implements LevelListener {
         if (layer == 0) {
             applyPendingChunks();
             Chunk.rebuiltThisFrame = 0;
+            sortedRender.clear();
+            sortedRender.addAll(renderChunks.values());
+            int[] pc = playerChunkCoords();
+            if (pc != null) {
+                final int[] pcf = pc;
+                sortedRender.sort((a, b) -> Long.compare(
+                    chunkDistSq(a.chunkX, a.chunkY, a.chunkZ, pcf),
+                    chunkDistSq(b.chunkX, b.chunkY, b.chunkZ, pcf)));
+            }
         }
 
         Frustum frustum = Frustum.getFrustum();
-        for (Chunk rc : renderChunks.values()) {
-            if (frustum.cubeInFrustum(rc.boundingBox)) {
-                rc.render(layer);
+        if (layer == 1) {
+            for (int i = sortedRender.size() - 1; i >= 0; i--) {
+                Chunk rc = sortedRender.get(i);
+                if (frustum.cubeInFrustum(rc.boundingBox)) rc.render(layer);
+            }
+        } else {
+            for (Chunk rc : sortedRender) {
+                if (frustum.cubeInFrustum(rc.boundingBox)) rc.render(layer);
             }
         }
     }

@@ -59,7 +59,7 @@ public class ChunkTracker {
         int minCZ = playerCZ - renderDistance;
         int maxCZ = playerCZ + renderDistance;
 
-        // unload chunks now out of range.
+        // unload chunks now out of range
         Set<Long> toRemove = new HashSet<>();
         for (long key : sentChunks) {
             int cx = unpackX(key), cy = unpackY(key), cz = unpackZ(key);
@@ -74,18 +74,31 @@ public class ChunkTracker {
         }
         sentChunks.removeAll(toRemove);
 
-        // load any new chunks now in range.
+        java.util.ArrayList<int[]> toSend = new java.util.ArrayList<>();
         for (int cx = minCX; cx <= maxCX; cx++) {
             for (int cy = minCY; cy <= maxCY; cy++) {
                 for (int cz = minCZ; cz <= maxCZ; cz++) {
                     long key = pack(cx, cy, cz);
-                    if (!sentChunks.contains(key)) {
-                        writeChunk(out, level, cx, cy, cz);
-                        sentChunks.add(key);
-                        addRef(cx, cy, cz);
-                    }
+                    if (sentChunks.contains(key)) continue;
+                    toSend.add(new int[]{ cx, cy, cz });
                 }
             }
+        }
+
+        final int pcx = playerCX, pcy = playerCY, pcz = playerCZ;
+        toSend.sort((a, b) -> {
+            int adx = a[0] - pcx, ady = a[1] - pcy, adz = a[2] - pcz;
+            int bdx = b[0] - pcx, bdy = b[1] - pcy, bdz = b[2] - pcz;
+            int da = adx * adx + ady * ady + adz * adz;
+            int db = bdx * bdx + bdy * bdy + bdz * bdz;
+            return Integer.compare(da, db);
+        });
+
+        for (int[] c : toSend) {
+            int cx = c[0], cy = c[1], cz = c[2];
+            writeChunk(out, level, cx, cy, cz);
+            sentChunks.add(pack(cx, cy, cz));
+            addRef(cx, cy, cz);
         }
     }
 
